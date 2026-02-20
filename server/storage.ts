@@ -85,6 +85,12 @@ export class DatabaseStorage implements IStorage {
     await db.delete(meals).where(eq(meals.id, id));
   }
 
+  async updateMeal(id: number, updates: Partial<InsertMeal>): Promise<Meal> {
+    const [meal] = await db.update(meals).set(updates).where(eq(meals.id, id)).returning();
+    if (!meal) throw new Error("Meal not found");
+    return meal;
+  }
+
   async getPantryItems(): Promise<PantryItem[]> {
     return await db.select().from(pantryItems);
   }

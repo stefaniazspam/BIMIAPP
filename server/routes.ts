@@ -169,6 +169,17 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
     res.status(204).send();
   });
 
+  app.patch('/api/meals/:id', async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const updates = req.body;
+      const meal = await storage.updateMeal(id, updates);
+      res.status(200).json(meal);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update meal" });
+    }
+  });
+
   // Pantry
   app.get(api.pantry.list.path, async (req, res) => {
     const items = await storage.getPantryItems();

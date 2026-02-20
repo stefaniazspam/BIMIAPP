@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import { useDailyLog, useUpsertDailyLog, useMeals, useCreateMeal, useDeleteMeal } from "@/hooks/use-bimi";
+import { useDailyLog, useUpsertDailyLog, useMeals, useCreateMeal, useDeleteMeal, useUpdateMeal } from "@/hooks/use-bimi";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, Utensils, Coffee, Apple, Moon } from "lucide-react";
+import { Plus, Trash2, Utensils, Coffee, Apple, Moon, Camera, Barcode } from "lucide-react";
 import { motion } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -19,8 +19,10 @@ export default function Meals() {
   const upsertLog = useUpsertDailyLog();
   const createMeal = useCreateMeal();
   const deleteMeal = useDeleteMeal();
+  const updateMeal = useUpdateMeal();
 
   const [isMealOpen, setIsMealOpen] = useState(false);
+  const [editingMealId, setEditingMealId] = useState<number | null>(null);
   const [newMeal, setNewMeal] = useState({
     name: "", calories: "", protein: "", carbs: "", fat: "", type: "breakfast"
   });
@@ -35,7 +37,7 @@ export default function Meals() {
   };
 
   const handleAddMeal = async () => {
-    await createMeal.mutateAsync({
+    const mealData = {
       userId: 1,
       date: today,
       name: newMeal.name,
@@ -44,9 +46,30 @@ export default function Meals() {
       protein: Number(newMeal.protein) || 0,
       carbs: Number(newMeal.carbs) || 0,
       fat: Number(newMeal.fat) || 0,
-    });
+    };
+
+    if (editingMealId) {
+      await updateMeal.mutateAsync({ id: editingMealId, ...mealData });
+    } else {
+      await createMeal.mutateAsync(mealData);
+    }
+    
     setNewMeal({ name: "", calories: "", protein: "", carbs: "", fat: "", type: "breakfast" });
+    setEditingMealId(null);
     setIsMealOpen(false);
+  };
+
+  const handleEditClick = (meal: any) => {
+    setNewMeal({
+      name: meal.name,
+      calories: String(meal.calories),
+      protein: String(meal.protein),
+      carbs: String(meal.carbs),
+      fat: String(meal.fat),
+      type: meal.mealType
+    });
+    setEditingMealId(meal.id);
+    setIsMealOpen(true);
   };
 
   const mealTypes = [
@@ -68,9 +91,17 @@ export default function Meals() {
           </DialogTrigger>
           <DialogContent className="sm:max-w-md rounded-2xl">
             <DialogHeader>
-              <DialogTitle className="font-display text-xl">Aggiungi Pasto</DialogTitle>
+              <DialogTitle className="font-display text-xl">{editingMealId ? "Modifica Pasto" : "Aggiungi Pasto"}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              <div className="flex gap-2 mb-2">
+                <Button variant="outline" className="flex-1 gap-2 rounded-xl h-12">
+                  <Camera className="w-5 h-5 text-primary" /> Foto
+                </Button>
+                <Button variant="outline" className="flex-1 gap-2 rounded-xl h-12">
+                  <Barcode className="w-5 h-5 text-primary" /> Barcode
+                </Button>
+              </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Select value={newMeal.type} onValueChange={(v) => setNewMeal({...newMeal, type: v})}>
                   <SelectTrigger className="col-span-4 rounded-xl">
@@ -181,7 +212,8 @@ export default function Meals() {
                       key={meal.id} 
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="group bg-card p-4 rounded-xl shadow-sm border border-border flex justify-between items-center"
+                      className="group bg-card p-4 rounded-xl shadow-sm border border-border flex justify-between items-center cursor-pointer hover:border-primary/50 transition-colors"
+                      onClick={() => handleEditClick(meal)}
                     >
                       <div>
                         <p className="font-bold">{meal.name}</p>
@@ -193,7 +225,10 @@ export default function Meals() {
                         variant="ghost" 
                         size="icon" 
                         className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 hover:text-destructive rounded-full"
-                        onClick={() => deleteMeal.mutate(meal.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteMeal.mutate(meal.id);
+                        }}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

@@ -87,6 +87,26 @@ export function useDeleteMeal() {
   });
 }
 
+export function useUpdateMeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: number } & Partial<InsertMeal>) => {
+      const url = buildUrl('/api/meals/:id', { id });
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update meal");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.meals.list.path] });
+    },
+  });
+}
+
 export function useGenerateRecipe() {
   return useMutation({
     mutationFn: async (ingredients: string[]) => {

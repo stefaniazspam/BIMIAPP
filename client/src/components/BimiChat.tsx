@@ -26,7 +26,7 @@ export function BimiChat() {
   const recorder = useVoiceRecorder();
   const voiceStream = useVoiceStream({
     onUserTranscript: (text) => {
-      setMessages(prev => [...prev, { role: 'user', text }]);
+      setInput(prev => prev ? prev + " " + text : text);
     },
     onTranscript: (text, full) => {
       setMessages(prev => {
@@ -94,14 +94,6 @@ export function BimiChat() {
               </p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleMicClick}
-            className={`rounded-full ${recorder.state === 'recording' ? 'bg-red-100 text-red-600 animate-pulse' : 'text-secondary'}`}
-          >
-            {recorder.state === 'recording' ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
-          </Button>
         </div>
 
         <ScrollArea className="flex-1 p-4 bg-muted/5">
@@ -137,22 +129,40 @@ export function BimiChat() {
           </div>
         </ScrollArea>
 
-        <form onSubmit={handleSubmit} className="p-4 bg-background border-t border-border flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Chiedi a Bimì..."
-            className="rounded-full bg-muted/30 border-muted-foreground/20 focus:ring-secondary"
-            disabled={chatMutation.isPending}
-          />
-          <Button 
-            type="submit" 
-            size="icon" 
-            className="rounded-full bg-secondary hover:bg-secondary/90 text-secondary-foreground shrink-0"
-            disabled={chatMutation.isPending || !input.trim()}
-          >
-            <Send className="w-5 h-5" />
-          </Button>
+        <form onSubmit={handleSubmit} className="p-4 bg-background border-t border-border flex flex-col gap-3">
+          <div className="flex gap-2">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Chiedi a Bimì..."
+              className="rounded-full bg-muted/30 border-muted-foreground/20 focus:ring-secondary flex-1"
+              disabled={chatMutation.isPending}
+            />
+            <div className="flex gap-1 shrink-0">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleMicClick}
+                className={`rounded-full h-10 w-10 ${recorder.state === 'recording' ? 'bg-red-100 text-red-600 animate-pulse' : 'text-secondary hover:bg-secondary/10'}`}
+              >
+                {recorder.state === 'recording' ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
+              </Button>
+              <Button 
+                type="submit" 
+                size="icon" 
+                className="rounded-full bg-secondary hover:bg-secondary/90 text-secondary-foreground h-10 w-10"
+                disabled={chatMutation.isPending || !input.trim()}
+              >
+                <Send className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+          {recorder.state === 'recording' && (
+            <p className="text-[10px] text-center text-red-500 font-medium animate-pulse">
+              Sto ascoltando... Parla ora
+            </p>
+          )}
         </form>
       </DialogContent>
     </Dialog>
