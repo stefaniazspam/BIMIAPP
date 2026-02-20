@@ -1,38 +1,143 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { db } from "./db";
+import {
+  users, dailyLogs, meals, pantryItems, shoppingListItems, reminders,
+  type User, type InsertUser,
+  type DailyLog, type InsertDailyLog, type UpdateDailyLogRequest,
+  type Meal, type InsertMeal, type UpdateMealRequest,
+  type PantryItem, type InsertPantryItem, type UpdatePantryItemRequest,
+  type ShoppingListItem, type InsertShoppingListItem, type UpdateShoppingListItemRequest,
+  type Reminder, type InsertReminder, type UpdateReminderRequest
+} from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
+  // Users
+  getUser(id: number): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  
+  // Daily Logs
+  getDailyLog(date: string): Promise<DailyLog | undefined>;
+  upsertDailyLog(log: InsertDailyLog): Promise<DailyLog>;
+  
+  // Meals
+  getMeals(date?: string): Promise<Meal[]>;
+  createMeal(meal: InsertMeal): Promise<Meal>;
+  deleteMeal(id: number): Promise<void>;
+  
+  // Pantry
+  getPantryItems(): Promise<PantryItem[]>;
+  createPantryItem(item: InsertPantryItem): Promise<PantryItem>;
+  updatePantryItem(id: number, updates: UpdatePantryItemRequest): Promise<PantryItem>;
+  deletePantryItem(id: number): Promise<void>;
+  
+  // Shopping List
+  getShoppingListItems(): Promise<ShoppingListItem[]>;
+  createShoppingListItem(item: InsertShoppingListItem): Promise<ShoppingListItem>;
+  updateShoppingListItem(id: number, updates: UpdateShoppingListItemRequest): Promise<ShoppingListItem>;
+  deleteShoppingListItem(id: number): Promise<void>;
+  
+  // Reminders
+  getReminders(): Promise<Reminder[]>;
+  createReminder(reminder: InsertReminder): Promise<Reminder>;
+  updateReminder(id: number, updates: UpdateReminderRequest): Promise<Reminder>;
+  deleteReminder(id: number): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
-  }
-
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [inserted] = await db.insert(users).values(user).returning();
+    return inserted;
+  }
+
+  async getDailyLog(date: string): Promise<DailyLog | undefined> {
+    const [log] = await db.select().from(dailyLogs).where(eq(dailyLogs.date, date));
+    return log;
+  }
+
+  async upsertDailyLog(log: InsertDailyLog): Promise<DailyLog> {
+    const [existing] = await db.select().from(dailyLogs).where(eq(dailyLogs.date, log.date));
+    if (existing) {
+      const [updated] = await db.update(dailyLogs).set(log).where(eq(dailyLogs.id, existing.id)).returning();
+      return updated;
+    }
+    const [inserted] = await db.insert(dailyLogs).values(log).returning();
+    return inserted;
+  }
+
+  async getMeals(date?: string): Promise<Meal[]> {
+    if (date) {
+      return await db.select().from(meals).where(eq(meals.date, date));
+    }
+    return await db.select().from(meals);
+  }
+
+  async createMeal(meal: InsertMeal): Promise<Meal> {
+    const [inserted] = await db.insert(meals).values(meal).returning();
+    return inserted;
+  }
+
+  async deleteMeal(id: number): Promise<void> {
+    await db.delete(meals).where(eq(meals.id, id));
+  }
+
+  async getPantryItems(): Promise<PantryItem[]> {
+    return await db.select().from(pantryItems);
+  }
+
+  async createPantryItem(item: InsertPantryItem): Promise<PantryItem> {
+    const [inserted] = await db.insert(pantryItems).values(item).returning();
+    return inserted;
+  }
+
+  async updatePantryItem(id: number, updates: UpdatePantryItemRequest): Promise<PantryItem> {
+    const [updated] = await db.update(pantryItems).set(updates).where(eq(pantryItems.id, id)).returning();
+    return updated;
+  }
+
+  async deletePantryItem(id: number): Promise<void> {
+    await db.delete(pantryItems).where(eq(pantryItems.id, id));
+  }
+
+  async getShoppingListItems(): Promise<ShoppingListItem[]> {
+    return await db.select().from(shoppingListItems);
+  }
+
+  async createShoppingListItem(item: InsertShoppingListItem): Promise<ShoppingListItem> {
+    const [inserted] = await db.insert(shoppingListItems).values(item).returning();
+    return inserted;
+  }
+
+  async updateShoppingListItem(id: number, updates: UpdateShoppingListItemRequest): Promise<ShoppingListItem> {
+    const [updated] = await db.update(shoppingListItems).set(updates).where(eq(shoppingListItems.id, id)).returning();
+    return updated;
+  }
+
+  async deleteShoppingListItem(id: number): Promise<void> {
+    await db.delete(shoppingListItems).where(eq(shoppingListItems.id, id));
+  }
+
+  async getReminders(): Promise<Reminder[]> {
+    return await db.select().from(reminders);
+  }
+
+  async createReminder(reminder: InsertReminder): Promise<Reminder> {
+    const [inserted] = await db.insert(reminders).values(reminder).returning();
+    return inserted;
+  }
+
+  async updateReminder(id: number, updates: UpdateReminderRequest): Promise<Reminder> {
+    const [updated] = await db.update(reminders).set(updates).where(eq(reminders.id, id)).returning();
+    return updated;
+  }
+
+  async deleteReminder(id: number): Promise<void> {
+    await db.delete(reminders).where(eq(reminders.id, id));
+  }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

@@ -1,18 +1,97 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// --- Users (MVP: single default user) ---
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+// --- Daily Logs (Menstrual cycle, defecation, general notes) ---
+export const dailyLogs = pgTable("daily_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  date: text("date").notNull().unique(), // YYYY-MM-DD
+  menstrualPhase: text("menstrual_phase"), // 'follicular', 'ovulation', 'luteal', 'menstrual'
+  flow: text("flow"), // 'light', 'medium', 'heavy'
+  intercourse: boolean("intercourse").default(false),
+  defecated: boolean("defecated").default(false),
+  notes: text("notes"),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
+// --- Meals (Pasti) ---
+export const meals = pgTable("meals", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  date: text("date").notNull(), // YYYY-MM-DD
+  mealType: text("meal_type").notNull(), // 'breakfast', 'lunch', 'dinner', 'snack'
+  name: text("name").notNull(),
+  calories: integer("calories").notNull(),
+  protein: integer("protein"),
+  carbs: integer("carbs"),
+  fat: integer("fat"),
+  imageUrl: text("image_url"),
+});
+
+// --- Pantry (Dispensa, Frigo, Freezer) ---
+export const pantryItems = pgTable("pantry_items", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  category: text("category").notNull(), // 'dispensa', 'frigo', 'freezer'
+  quantity: integer("quantity").notNull().default(1),
+  expirationDate: text("expiration_date"), // YYYY-MM-DD
+});
+
+// --- Shopping List ---
+export const shoppingListItems = pgTable("shopping_list_items", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  checked: boolean("checked").default(false),
+});
+
+// --- Reminders (Promemoria) ---
+export const reminders = pgTable("reminders", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  title: text("title").notNull(),
+  remindAt: timestamp("remind_at").notNull(),
+  completed: boolean("completed").default(false),
+});
+
+// --- Schemas & Types ---
+export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export const insertDailyLogSchema = createInsertSchema(dailyLogs).omit({ id: true });
+export type DailyLog = typeof dailyLogs.$inferSelect;
+export type InsertDailyLog = z.infer<typeof insertDailyLogSchema>;
+export type UpdateDailyLogRequest = Partial<InsertDailyLog>;
+
+export const insertMealSchema = createInsertSchema(meals).omit({ id: true });
+export type Meal = typeof meals.$inferSelect;
+export type InsertMeal = z.infer<typeof insertMealSchema>;
+export type UpdateMealRequest = Partial<InsertMeal>;
+
+export const insertPantryItemSchema = createInsertSchema(pantryItems).omit({ id: true });
+export type PantryItem = typeof pantryItems.$inferSelect;
+export type InsertPantryItem = z.infer<typeof insertPantryItemSchema>;
+export type UpdatePantryItemRequest = Partial<InsertPantryItem>;
+
+export const insertShoppingListItemSchema = createInsertSchema(shoppingListItems).omit({ id: true });
+export type ShoppingListItem = typeof shoppingListItems.$inferSelect;
+export type InsertShoppingListItem = z.infer<typeof insertShoppingListItemSchema>;
+export type UpdateShoppingListItemRequest = Partial<InsertShoppingListItem>;
+
+export const insertReminderSchema = createInsertSchema(reminders).omit({ id: true });
+export type Reminder = typeof reminders.$inferSelect;
+export type InsertReminder = z.infer<typeof insertReminderSchema>;
+export type UpdateReminderRequest = Partial<InsertReminder>;
+
+export * from "./models/chat";
+
