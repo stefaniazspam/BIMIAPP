@@ -1,13 +1,16 @@
 import { format, addDays } from "date-fns";
 import { it } from "date-fns/locale";
-import { useDailyLog, useUpsertDailyLog, useMeals, usePantryItems, useReminders } from "@/hooks/use-bimi";
+import { useDailyLog, useUpsertDailyLog, useMeals, usePantryItems, useReminders, useGenerateRecipe } from "@/hooks/use-bimi";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
-import { AlertCircle, Droplets, Calendar, CheckCircle2, ArrowRight } from "lucide-react";
+import { AlertCircle, Droplets, Calendar, CheckCircle2, ArrowRight, ChefHat, Loader2 } from "lucide-react";
 import { MacroChart } from "@/components/MacroChart";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function Home() {
   const today = format(new Date(), "yyyy-MM-dd");
@@ -16,24 +19,33 @@ export default function Home() {
   const { data: pantry, isLoading: pantryLoading } = usePantryItems();
   const { data: reminders, isLoading: remindersLoading } = useReminders();
   const upsertLog = useUpsertDailyLog();
+  const generateRecipe = useGenerateRecipe();
+
+  const [recipe, setRecipe] = useState<string | null>(null);
 
   const handleDefecatedToggle = (checked: boolean) => {
     upsertLog.mutate({
       userId: 1,
       date: today,
       defecated: checked,
-      // preserve other fields if needed, simplified for MVP
-      // typically we'd merge with existing data, but upsert handles existing record lookup on backend usually
-      // For this implementation, we assume backend updates if exists or creates.
-      // If we need to preserve existing fields not in this payload, we should spread dailyLog data.
-      ...dailyLog, // spread existing data to not overwrite
-      menstrualPhase: dailyLog?.menstrualPhase || null, // ensure type safety
+      ...dailyLog,
+      menstrualPhase: dailyLog?.menstrualPhase || null,
       flow: dailyLog?.flow || null,
       notes: dailyLog?.notes || null
     });
   };
 
-  // Macro Calculation
+  const handleGenerateRecipe = async () => {
+    if (!expiringItems.length) return;
+    const ingredients = expiringItems.map(i => i.name);
+    try {
+      const res = await generateRecipe.mutateAsync(ingredients);
+      setRecipe(res.recipe);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const macros = meals?.reduce((acc, meal) => ({
     calories: acc.calories + (meal.calories || 0),
     protein: acc.protein + (meal.protein || 0),
@@ -57,7 +69,6 @@ export default function Home() {
 
   return (
     <div className="space-y-6 pb-20">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-display font-bold text-primary">Ciao, Bella!</h1>
@@ -70,7 +81,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Wellness Card */}
       <Card className="p-6 bg-gradient-to-br from-secondary/20 to-orange-100 dark:from-secondary/10 dark:to-orange-900/10 border-none shadow-lg">
         <h2 className="text-lg font-bold font-display mb-4 flex items-center gap-2">
           <Droplets className="w-5 h-5 text-accent" />
@@ -102,7 +112,6 @@ export default function Home() {
         </div>
       </Card>
 
-      {/* Macro Summary */}
       <Card className="p-6 shadow-md border-border/50">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold font-display">Riepilogo Nutrizione</h2>
@@ -132,13 +141,24 @@ export default function Home() {
         </div>
       </Card>
 
-      {/* Expiring Soon */}
       {expiringItems.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-display font-bold text-lg text-red-500 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5" />
-            In Scadenza!
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-display font-bold text-lg text-red-500 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              In Scadenza!
+            </h3>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="rounded-full gap-2 border-orange-200 text-orange-600"
+              onClick={handleGenerateRecipe}
+              disabled={generateRecipe.isPending}
+            >
+              {generateRecipe.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChefHat className="w-4 h-4" />}
+              Genera Ricetta
+            </Button>
+          </div>
           <div className="grid gap-3">
             {expiringItems.map(item => (
               <div key={item.id} className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 p-4 rounded-xl flex items-center justify-between">
@@ -157,7 +177,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Today's Reminders */}
       <div className="space-y-3">
         <h3 className="font-display font-bold text-lg flex items-center justify-between">
           Promemoria di Oggi
@@ -188,6 +207,20 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!recipe} onOpenChange={() => setRecipe(null)}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ChefHat className="text-orange-500" />
+              Ricetta Bimì
+            </DialogTitle>
+          </DialogHeader>
+          <div className="whitespace-pre-wrap text-sm leading-relaxed">
+            {recipe}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

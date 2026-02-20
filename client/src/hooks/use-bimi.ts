@@ -87,6 +87,21 @@ export function useDeleteMeal() {
   });
 }
 
+export function useGenerateRecipe() {
+  return useMutation({
+    mutationFn: async (ingredients: string[]) => {
+      const res = await fetch(api.recipes.generate.path, {
+        method: api.recipes.generate.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ingredients }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to generate recipe");
+      return api.recipes.generate.responses[200].parse(await res.json());
+    },
+  });
+}
+
 // --- Pantry ---
 export function usePantryItems() {
   return useQuery({

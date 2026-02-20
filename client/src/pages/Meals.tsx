@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, Utensils, Coffee, Apple, Moon } from "lucide-react";
 import { motion } from "framer-motion";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function Meals() {
   const today = format(new Date(), "yyyy-MM-dd");

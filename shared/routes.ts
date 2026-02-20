@@ -27,6 +27,18 @@ export const api = {
       }
     }
   },
+  recipes: {
+    generate: {
+      method: 'POST' as const,
+      path: '/api/recipes/generate' as const,
+      input: z.object({ ingredients: z.array(z.string()) }),
+      responses: {
+        200: z.object({ recipe: z.string() }),
+        400: errorSchemas.validation,
+        500: errorSchemas.internal,
+      }
+    }
+  },
   dailyLogs: {
     get: {
       method: 'GET' as const,

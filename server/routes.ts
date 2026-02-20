@@ -5,6 +5,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import OpenAI from "openai";
 import { registerChatRoutes } from "./replit_integrations/chat";
+import { registerAudioRoutes } from "./replit_integrations/audio";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -17,6 +18,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Use generic chat routes for standard text chat if needed
   registerChatRoutes(app);
+  registerAudioRoutes(app);
 
   app.post(api.chat.message.path, async (req, res) => {
     try {
@@ -270,6 +272,25 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
   app.delete(api.reminders.delete.path, async (req, res) => {
     await storage.deleteReminder(Number(req.params.id));
     res.status(204).send();
+  });
+
+  app.post(api.recipes.generate.path, async (req, res) => {
+    try {
+      const { ingredients } = api.recipes.generate.input.parse(req.body);
+      
+      const prompt = `Sei Bimì, un'assistente AI culinaria. Crea una ricetta veloce e gustosa in italiano usando principalmente questi ingredienti in scadenza: ${ingredients.join(", ")}. 
+Includi anche altri ingredienti base che solitamente si hanno in casa (sale, olio, spezie, ecc). 
+Formatta la risposta con Titolo, Ingredienti e Procedimento breve.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.1",
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      res.json({ recipe: response.choices[0].message.content || "Non sono riuscita a generare una ricetta." });
+    } catch (err) {
+      res.status(500).json({ message: "Errore generazione ricetta" });
+    }
   });
 
   // Setup seed data

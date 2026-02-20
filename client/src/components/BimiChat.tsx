@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, Send, X, Bot, Sparkles } from "lucide-react";
+import { MessageCircle, Send, X, Bot, Sparkles, Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useChat } from "@/hooks/use-bimi";
 import { motion, AnimatePresence } from "framer-motion";
+import { useVoiceRecorder, useVoiceStream } from "@/replit_integrations/audio";
 
 type Message = {
   role: 'user' | 'assistant';
@@ -22,11 +23,36 @@ export function BimiChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatMutation = useChat();
 
+  const recorder = useVoiceRecorder();
+  const voiceStream = useVoiceStream({
+    onUserTranscript: (text) => {
+      setMessages(prev => [...prev, { role: 'user', text }]);
+    },
+    onTranscript: (text, full) => {
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last && last.role === 'assistant') {
+          return [...prev.slice(0, -1), { role: 'assistant', text: full }];
+        }
+        return [...prev, { role: 'assistant', text: full }];
+      });
+    },
+  });
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, open]);
+
+  const handleMicClick = async () => {
+    if (recorder.state === "recording") {
+      const blob = await recorder.stopRecording();
+      await voiceStream.streamVoiceResponse(`/api/conversations/1/messages`, blob);
+    } else {
+      await recorder.startRecording();
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,17 +81,27 @@ export function BimiChat() {
       </DialogTrigger>
       
       <DialogContent className="sm:max-w-[425px] p-0 gap-0 overflow-hidden border-0 shadow-2xl bg-background/95 backdrop-blur-xl h-[80vh] sm:h-[600px] flex flex-col rounded-3xl">
-        <div className="p-4 bg-secondary/10 border-b border-border flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-secondary to-orange-400 flex items-center justify-center shadow-inner">
-            <Bot className="text-white w-6 h-6" />
+        <div className="p-4 bg-secondary/10 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-secondary to-orange-400 flex items-center justify-center shadow-inner">
+              <Bot className="text-white w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-display font-bold text-lg text-foreground">Bimì AI</h3>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                Online
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-display font-bold text-lg text-foreground">Bimì AI</h3>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Online
-            </p>
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleMicClick}
+            className={`rounded-full ${recorder.state === 'recording' ? 'bg-red-100 text-red-600 animate-pulse' : 'text-secondary'}`}
+          >
+            {recorder.state === 'recording' ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
+          </Button>
         </div>
 
         <ScrollArea className="flex-1 p-4 bg-muted/5">
@@ -88,7 +124,7 @@ export function BimiChat() {
                 </div>
               </motion.div>
             ))}
-            {chatMutation.isPending && (
+            {(chatMutation.isPending || voiceStream.playbackState === 'playing') && (
               <div className="flex justify-start">
                 <div className="bg-white dark:bg-zinc-800 border border-border rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1">
                   <span className="w-2 h-2 rounded-full bg-secondary animate-bounce" />
