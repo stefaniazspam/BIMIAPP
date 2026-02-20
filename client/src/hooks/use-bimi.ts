@@ -91,8 +91,8 @@ export function useUpdateMeal() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: number } & Partial<InsertMeal>) => {
-      const url = buildUrl('/api/meals/:id', { id });
-      const res = await fetch(url, {
+      const url = buildUrl(api.meals.delete.path.replace(':id', String(id)), {}); // Temporary fix for URL building
+      const res = await fetch(`/api/meals/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
