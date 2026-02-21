@@ -107,17 +107,40 @@ export function useUpdateMeal() {
   });
 }
 
-export function useGenerateRecipe() {
+export function useGenerateMeal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { prompt: string, date: string, mealType: string, servings: number, usePantry: boolean }) => {
+      const res = await fetch("/api/meals/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to generate meal");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.meals.list.path] });
+    },
+  });
+}
+
+export function useAddToShoppingList() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (ingredients: string[]) => {
-      const res = await fetch(api.recipes.generate.path, {
-        method: api.recipes.generate.method,
+      const res = await fetch("/api/meals/add-to-shopping-list", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ingredients }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to generate recipe");
-      return api.recipes.generate.responses[200].parse(await res.json());
+      if (!res.ok) throw new Error("Failed to add to shopping list");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.shoppingList.list.path] });
     },
   });
 }

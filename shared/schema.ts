@@ -28,7 +28,11 @@ export const meals = pgTable("meals", {
   date: text("date").notNull(), // YYYY-MM-DD
   mealType: text("meal_type").notNull(), // 'breakfast', 'lunch', 'dinner', 'snack'
   name: text("name").notNull(),
-  calories: integer("calories").notNull(),
+  recipe: text("recipe"),
+  ingredients: text("ingredients").array(),
+  servings: integer("servings").default(1),
+  isPlanned: boolean("is_planned").default(false),
+  calories: integer("calories"),
   protein: integer("protein"),
   carbs: integer("carbs"),
   fat: integer("fat"),

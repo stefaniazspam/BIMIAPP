@@ -285,22 +285,66 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
     res.status(204).send();
   });
 
-  app.post(api.recipes.generate.path, async (req, res) => {
+  app.post("/api/meals/generate", async (req, res) => {
     try {
-      const { ingredients } = api.recipes.generate.input.parse(req.body);
+      const { prompt, date, mealType, servings, usePantry } = req.body;
       
-      const prompt = `Sei Bimì, un'assistente AI culinaria. Crea una ricetta veloce e gustosa in italiano usando principalmente questi ingredienti in scadenza: ${ingredients.join(", ")}. 
-Includi anche altri ingredienti base che solitamente si hanno in casa (sale, olio, spezie, ecc). 
-Formatta la risposta con Titolo, Ingredienti e Procedimento breve.`;
+      let pantryContext = "";
+      if (usePantry) {
+        const pantry = await storage.getPantryItems();
+        pantryContext = `Utilizza principalmente questi ingredienti dalla dispensa: ${pantry.map(i => i.name).join(", ")}.`;
+      }
+
+      const systemPrompt = `Sei Bimì, un'assistente culinaria. Genera una ricetta per ${servings} persone basata sulla richiesta: "${prompt}". 
+      ${pantryContext}
+      Rispondi ESCLUSIVAMENTE con un oggetto JSON nel seguente formato:
+      {
+        "name": "Titolo Ricetta",
+        "recipe": "Procedimento passo dopo passo...",
+        "ingredients": ["ingrediente 1", "ingrediente 2"]
+      }`;
 
       const response = await openai.chat.completions.create({
-        model: "gpt-5.1",
-        messages: [{ role: "user", content: prompt }],
+        model: "gpt-4o", // Using 4o for reliable JSON
+        messages: [{ role: "system", content: systemPrompt }],
+        response_format: { type: "json_object" }
       });
 
-      res.json({ recipe: response.choices[0].message.content || "Non sono riuscita a generare una ricetta." });
+      const content = JSON.parse(response.choices[0].message.content || "{}");
+      
+      const meal = await storage.createMeal({
+        userId: 1,
+        date,
+        mealType,
+        name: content.name,
+        recipe: content.recipe,
+        ingredients: content.ingredients,
+        servings: servings,
+        isPlanned: true,
+        calories: 0 // No longer calculating macros as per request
+      });
+
+      res.json(meal);
     } catch (err) {
-      res.status(500).json({ message: "Errore generazione ricetta" });
+      console.error(err);
+      res.status(500).json({ message: "Errore generazione pasto" });
+    }
+  });
+
+  app.post("/api/meals/add-to-shopping-list", async (req, res) => {
+    try {
+      const { ingredients } = req.body;
+      for (const item of ingredients) {
+        await storage.createShoppingListItem({
+          userId: 1,
+          name: item,
+          quantity: 1,
+          checked: false
+        });
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Errore lista spesa" });
     }
   });
 
