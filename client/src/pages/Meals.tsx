@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Plus, Trash2, Utensils, Coffee, Apple, Moon, ChefHat, ShoppingCart, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 export default function Meals() {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const startDate = startOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -137,26 +139,31 @@ export default function Meals() {
                 placeholder="es: Una cena leggera a base di salmone e verdure..." 
                 className="rounded-xl h-12"
                 value={genPrompt}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  setGenPrompt(e.target.value);
-                }}
+                onChange={(e) => setGenPrompt(e.target.value)}
+                onPointerDown={(e) => e.stopPropagation()}
               />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-muted-foreground">N. Persone</label>
-                <Input 
-                  type="number" 
-                  min="1" 
-                  value={servings} 
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    setServings(Number(e.target.value));
-                  }} 
-                  className="rounded-xl" 
-                />
+                <Select 
+                  value={String(servings)} 
+                  onValueChange={(v) => {
+                    setServings(Number(v));
+                  }}
+                >
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="Persone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <SelectItem key={i + 1} value={String(i + 1)}>
+                        {i + 1} {i === 0 ? "persona" : "persone"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex items-center gap-2 pt-8">
                 <Checkbox id="pantry" checked={usePantry} onCheckedChange={(c) => setUsePantry(!!c)} />
