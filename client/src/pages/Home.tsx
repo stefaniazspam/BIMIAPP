@@ -4,8 +4,7 @@ import { useDailyLog, useUpsertDailyLog, useMeals, usePantryItems, useReminders 
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
-import { AlertCircle, Droplets, Calendar, CheckCircle2, ArrowRight, ChefHat } from "lucide-react";
-import { MacroChart } from "@/components/MacroChart";
+import { AlertCircle, Droplets, Calendar, CheckCircle2, ArrowRight, ChefHat, Utensils } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -106,32 +105,45 @@ export default function Home() {
       </Card>
 
       <Card className="p-6 shadow-md border-border/50">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold font-display">Riepilogo Nutrizione</h2>
-          <span className="text-xs font-medium px-2 py-1 bg-primary/10 text-primary rounded-full">
-            {macros.calories} / 2000 kcal
-          </span>
-        </div>
-
-        <div className="flex flex-col md:flex-row items-center gap-6">
-          <div className="w-full md:w-1/2">
-            <MacroChart protein={macros.protein} carbs={macros.carbs} fat={macros.fat} />
+        <h2 className="text-lg font-bold font-display mb-4 flex items-center gap-2">
+          <Utensils className="w-5 h-5 text-primary" />
+          I miei pasti di oggi
+        </h2>
+        
+        {mealsLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
           </div>
-          <div className="w-full md:w-1/2 grid grid-cols-3 gap-2 text-center">
-            <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <span className="block text-xs text-muted-foreground">Prot</span>
-              <span className="block font-bold text-green-700 dark:text-green-400">{macros.protein}g</span>
-            </div>
-            <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <span className="block text-xs text-muted-foreground">Carbo</span>
-              <span className="block font-bold text-yellow-600 dark:text-yellow-400">{macros.carbs}g</span>
-            </div>
-            <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-              <span className="block text-xs text-muted-foreground">Grassi</span>
-              <span className="block font-bold text-orange-600 dark:text-orange-400">{macros.fat}g</span>
-            </div>
+        ) : meals?.filter(m => m.date === today && m.isPlanned).length === 0 ? (
+          <div className="text-center py-6 border-2 border-dashed border-muted rounded-2xl">
+            <p className="text-sm text-muted-foreground mb-3">Nessuna ricetta generata per oggi</p>
+            <Link href="/pasti">
+              <Button size="sm" variant="outline" className="rounded-full">Pianifica ora</Button>
+            </Link>
           </div>
-        </div>
+        ) : (
+          <div className="grid gap-3">
+            {meals?.filter(m => m.date === today && m.isPlanned).map(meal => (
+              <div key={meal.id} className="bg-card p-4 rounded-xl shadow-sm border border-border flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    <ChefHat className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm">{meal.name}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">{meal.mealType}</p>
+                  </div>
+                </div>
+                <Link href="/pasti">
+                  <Button variant="ghost" size="icon" className="rounded-full h-8 w-8 text-primary">
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       {expiringItems.length > 0 && (

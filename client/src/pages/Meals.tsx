@@ -137,14 +137,26 @@ export default function Meals() {
                 placeholder="es: Una cena leggera a base di salmone e verdure..." 
                 className="rounded-xl h-12"
                 value={genPrompt}
-                onChange={(e) => setGenPrompt(e.target.value)}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  setGenPrompt(e.target.value);
+                }}
               />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-muted-foreground">N. Persone</label>
-                <Input type="number" min="1" value={servings} onChange={(e) => setServings(Number(e.target.value))} className="rounded-xl" />
+                <Input 
+                  type="number" 
+                  min="1" 
+                  value={servings} 
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    setServings(Number(e.target.value));
+                  }} 
+                  className="rounded-xl" 
+                />
               </div>
               <div className="flex items-center gap-2 pt-8">
                 <Checkbox id="pantry" checked={usePantry} onCheckedChange={(c) => setUsePantry(!!c)} />
