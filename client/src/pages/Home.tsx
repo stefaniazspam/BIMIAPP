@@ -1,10 +1,10 @@
 import { format, addDays } from "date-fns";
 import { it } from "date-fns/locale";
-import { useDailyLog, useUpsertDailyLog, useMeals, usePantryItems, useReminders, useGenerateRecipe } from "@/hooks/use-bimi";
+import { useDailyLog, useUpsertDailyLog, useMeals, usePantryItems, useReminders } from "@/hooks/use-bimi";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
-import { AlertCircle, Droplets, Calendar, CheckCircle2, ArrowRight, ChefHat, Loader2 } from "lucide-react";
+import { AlertCircle, Droplets, Calendar, CheckCircle2, ArrowRight, ChefHat } from "lucide-react";
 import { MacroChart } from "@/components/MacroChart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,6 @@ export default function Home() {
   const { data: pantry, isLoading: pantryLoading } = usePantryItems();
   const { data: reminders, isLoading: remindersLoading } = useReminders();
   const upsertLog = useUpsertDailyLog();
-  const generateRecipe = useGenerateRecipe();
 
   const [recipe, setRecipe] = useState<string | null>(null);
 
@@ -35,15 +34,9 @@ export default function Home() {
     });
   };
 
-  const handleGenerateRecipe = async () => {
-    if (!expiringItems.length) return;
-    const ingredients = expiringItems.map(i => i.name);
-    try {
-      const res = await generateRecipe.mutateAsync(ingredients);
-      setRecipe(res.recipe);
-    } catch (error) {
-      console.error(error);
-    }
+  const handleGenerateRecipe = () => {
+    // Redirect to meals page for generation as the new flow is centralized there
+    window.location.href = "/pasti";
   };
 
   const macros = meals?.reduce((acc, meal) => ({
@@ -153,10 +146,9 @@ export default function Home() {
               variant="outline" 
               className="rounded-full gap-2 border-orange-200 text-orange-600"
               onClick={handleGenerateRecipe}
-              disabled={generateRecipe.isPending}
             >
-              {generateRecipe.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChefHat className="w-4 h-4" />}
-              Genera Ricetta
+              <ChefHat className="w-4 h-4" />
+              Cucina con questi!
             </Button>
           </div>
           <div className="grid gap-3">
