@@ -29,6 +29,8 @@ export default function Meals() {
   const [usePantry, setUsePantry] = useState(false);
   
   const [viewRecipe, setViewRecipe] = useState<any>(null);
+  const [isSelectIngOpen, setIsSelectIngOpen] = useState(false);
+  const [selectedIngs, setSelectedIngs] = useState<string[]>([]);
 
   const mealTypes = [
     { id: "breakfast", label: "Colazione", icon: Coffee, color: "text-orange-500", bg: "bg-orange-100" },
@@ -202,13 +204,12 @@ export default function Meals() {
                 variant="outline" 
                 className="w-full mt-4 rounded-xl gap-2 border-primary/20 text-primary hover:bg-primary/5"
                 onClick={() => {
-                  addToShoppingList.mutate(viewRecipe.ingredients);
-                  setViewRecipe(null);
+                  setSelectedIngs(viewRecipe.ingredients || []);
+                  setIsSelectIngOpen(true);
                 }}
-                disabled={addToShoppingList.isPending}
               >
-                {addToShoppingList.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                Aggiungi ingredienti mancanti alla spesa
+                <Plus className="w-4 h-4" />
+                Scegli ingredienti da aggiungere alla spesa
               </Button>
             </div>
 
@@ -220,6 +221,43 @@ export default function Meals() {
                 {viewRecipe?.recipe}
               </div>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ingredient Selector Dialog */}
+      <Dialog open={isSelectIngOpen} onOpenChange={setIsSelectIngOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">Seleziona ingredienti</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid gap-2">
+              {viewRecipe?.ingredients?.map((ing: string) => (
+                <div key={ing} className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl">
+                  <Checkbox 
+                    id={ing} 
+                    checked={selectedIngs.includes(ing)}
+                    onCheckedChange={(checked) => {
+                      if (checked) setSelectedIngs([...selectedIngs, ing]);
+                      else setSelectedIngs(selectedIngs.filter(i => i !== ing));
+                    }}
+                  />
+                  <label htmlFor={ing} className="text-sm font-medium">{ing}</label>
+                </div>
+              ))}
+            </div>
+            <Button 
+              className="w-full rounded-xl"
+              onClick={async () => {
+                await addToShoppingList.mutateAsync(selectedIngs);
+                setIsSelectIngOpen(false);
+                setViewRecipe(null);
+              }}
+              disabled={addToShoppingList.isPending}
+            >
+              Aggiungi {selectedIngs.length} elementi alla spesa
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

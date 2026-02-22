@@ -40,6 +40,13 @@ export const api = {
     }
   },
   dailyLogs: {
+    list: {
+      method: "GET" as const,
+      path: "/api/daily-logs" as const,
+      responses: {
+        200: z.array(z.custom<typeof dailyLogs.$inferSelect>()),
+      },
+    },
     get: {
       method: 'GET' as const,
       path: '/api/daily-logs/:date' as const,

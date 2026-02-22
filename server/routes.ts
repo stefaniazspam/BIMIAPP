@@ -28,13 +28,13 @@ export async function registerRoutes(
       const pantry = await storage.getPantryItems();
       const reminders = await storage.getReminders();
       
-      const today = new Date().toISOString().split('T')[0];
-      const meals = await storage.getMeals(today);
-      const calories = meals.reduce((sum, m) => sum + m.calories, 0);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const mealsToday = await storage.getMeals(todayStr);
+      const calories = mealsToday.reduce((sum, m) => sum + (m.calories || 0), 0);
       
       const systemPrompt = `
 Sei Bimì, un'assistente AI per l'app Bimì. Il tuo scopo è aiutare l'utente a organizzare il tempo, promemoria, pasti e lista della spesa.
-Oggi è ${today}.
+Oggi è ${todayStr}.
 
 Dispensa attuale: ${JSON.stringify(pantry)}. Se l'utente chiede cosa mangiare, suggerisci ricette usando questi ingredienti.
 Promemoria attuali: ${JSON.stringify(reminders)}.
@@ -104,7 +104,7 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
 
       if (message.tool_calls) {
         for (const toolCall of message.tool_calls) {
-          if (toolCall.function.name === "add_shopping_list_item") {
+          if (toolCall.type === 'function' && toolCall.function.name === "add_shopping_list_item") {
             const args = JSON.parse(toolCall.function.arguments);
             await storage.createShoppingListItem({
               userId: 1,
@@ -113,13 +113,13 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
               checked: false
             });
             finalResponse = `Ho aggiunto ${args.quantity || 1}x ${args.name} alla tua lista della spesa!`;
-          } else if (toolCall.function.name === "clear_shopping_list") {
+          } else if (toolCall.type === 'function' && toolCall.function.name === "clear_shopping_list") {
             const items = await storage.getShoppingListItems();
             for (const item of items) {
               await storage.deleteShoppingListItem(item.id);
             }
             finalResponse = "Ho svuotato completamente la tua lista della spesa.";
-          } else if (toolCall.function.name === "add_reminder") {
+          } else if (toolCall.type === 'function' && toolCall.function.name === "add_reminder") {
             const args = JSON.parse(toolCall.function.arguments);
             await storage.createReminder({
               userId: 1,
@@ -153,6 +153,15 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
   });
 
   // Daily Logs
+  app.get("/api/daily-logs", async (req, res) => {
+    try {
+      const logs = await db.select().from(dailyLogs).where(eq(dailyLogs.userId, 1));
+      res.json(logs);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch daily logs" });
+    }
+  });
+
   app.get(api.dailyLogs.get.path, async (req, res) => {
     const log = await storage.getDailyLog(req.params.date);
     if (!log) return res.status(404).json({ message: 'Log not found' });

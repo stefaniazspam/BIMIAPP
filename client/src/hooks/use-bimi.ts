@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { 
   type InsertDailyLog, type InsertMeal, type InsertPantryItem, 
-  type InsertShoppingListItem, type InsertReminder,
+  type InsertShoppingListItem, type InsertReminder, type InsertUser,
   type UpdatePantryItemRequest, type UpdateShoppingListItemRequest, type UpdateReminderRequest
 } from "@shared/schema";
 
@@ -38,6 +38,17 @@ export function useUpdateUser() {
 }
 
 // --- Daily Logs ---
+export function useDailyLogs() {
+  return useQuery({
+    queryKey: [api.dailyLogs.list.path],
+    queryFn: async () => {
+      const res = await fetch("/api/daily-logs", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch daily logs");
+      return res.json();
+    },
+  });
+}
+
 export function useDailyLog(date: string) {
   return useQuery({
     queryKey: [api.dailyLogs.get.path, date],
