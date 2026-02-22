@@ -6,6 +6,37 @@ import {
   type UpdatePantryItemRequest, type UpdateShoppingListItemRequest, type UpdateReminderRequest
 } from "@shared/schema";
 
+// --- Users ---
+export function useUser() {
+  return useQuery({
+    queryKey: ["/api/user"],
+    queryFn: async () => {
+      const res = await fetch("/api/user/1", { credentials: "include" }); // Assuming user 1
+      if (!res.ok) throw new Error("Failed to fetch user");
+      return res.json();
+    },
+  });
+}
+
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (updates: Partial<InsertUser>) => {
+      const res = await fetch("/api/user", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update user");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    },
+  });
+}
+
 // --- Daily Logs ---
 export function useDailyLog(date: string) {
   return useQuery({

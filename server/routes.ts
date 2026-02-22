@@ -64,6 +64,17 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
         {
           type: "function" as const,
           function: {
+            name: "clear_shopping_list",
+            description: "Cancella completamente la lista della spesa",
+            parameters: {
+              type: "object",
+              properties: {}
+            }
+          }
+        },
+        {
+          type: "function" as const,
+          function: {
             name: "add_reminder",
             description: "Aggiungi un promemoria (es: fra 3 ore, domani alle 15, ecc)",
             parameters: {
@@ -102,6 +113,12 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
               checked: false
             });
             finalResponse = `Ho aggiunto ${args.quantity || 1}x ${args.name} alla tua lista della spesa!`;
+          } else if (toolCall.function.name === "clear_shopping_list") {
+            const items = await storage.getShoppingListItems();
+            for (const item of items) {
+              await storage.deleteShoppingListItem(item.id);
+            }
+            finalResponse = "Ho svuotato completamente la tua lista della spesa.";
           } else if (toolCall.function.name === "add_reminder") {
             const args = JSON.parse(toolCall.function.arguments);
             await storage.createReminder({
@@ -123,6 +140,15 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
          console.error(err);
          res.status(500).json({ message: "Internal server error" });
       }
+    }
+  });
+
+  app.patch("/api/user", async (req, res) => {
+    try {
+      const user = await storage.updateUser(1, req.body);
+      res.json(user);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update user" });
     }
   });
 
@@ -250,6 +276,18 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
     res.status(204).send();
   });
 
+  app.delete("/api/shopping-list", async (req, res) => {
+    try {
+      const items = await storage.getShoppingListItems();
+      for (const item of items) {
+        await storage.deleteShoppingListItem(item.id);
+      }
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to clear shopping list" });
+    }
+  });
+
   // Reminders
   app.get(api.reminders.list.path, async (req, res) => {
     const items = await storage.getReminders();
@@ -357,7 +395,9 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
 async function seedDatabase() {
   const usersList = await storage.getUser(1);
   if (!usersList) {
-    await storage.createUser({ username: "bimi_user", password: "password" });
+    await storage.createUser({ username: "Stefania", password: "password", cycleDuration: 33, periodDuration: 5 });
+  } else if (usersList.username !== "Stefania") {
+    await storage.updateUser(1, { username: "Stefania", cycleDuration: 33 });
   }
 
   const items = await storage.getPantryItems();

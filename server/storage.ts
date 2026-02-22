@@ -14,6 +14,7 @@ export interface IStorage {
   // Users
   getUser(id: number): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, updates: Partial<InsertUser>): Promise<User>;
   
   // Daily Logs
   getDailyLog(date: string): Promise<DailyLog | undefined>;
@@ -52,6 +53,12 @@ export class DatabaseStorage implements IStorage {
   async createUser(user: InsertUser): Promise<User> {
     const [inserted] = await db.insert(users).values(user).returning();
     return inserted;
+  }
+
+  async updateUser(id: number, updates: Partial<InsertUser>): Promise<User> {
+    const [updated] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+    if (!updated) throw new Error("User not found");
+    return updated;
   }
 
   async getDailyLog(date: string): Promise<DailyLog | undefined> {

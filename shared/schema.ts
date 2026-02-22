@@ -7,6 +7,8 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  cycleDuration: integer("cycle_duration").default(28),
+  periodDuration: integer("period_duration").default(5),
 });
 
 // --- Daily Logs (Menstrual cycle, defecation, general notes) ---
@@ -71,6 +73,7 @@ export const reminders = pgTable("reminders", {
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpdateUserRequest = Partial<InsertUser>;
 
 export const insertDailyLogSchema = createInsertSchema(dailyLogs).omit({ id: true });
 export type DailyLog = typeof dailyLogs.$inferSelect;
