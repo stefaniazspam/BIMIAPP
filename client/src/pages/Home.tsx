@@ -1,6 +1,6 @@
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
 import { it } from "date-fns/locale";
-import { useDailyLog, useUpsertDailyLog, useMeals, usePantryItems, useReminders, useUser, useUpdateUser } from "@/hooks/use-bimi";
+import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, usePantryItems, useReminders, useUser, useUpdateUser } from "@/hooks/use-bimi";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
@@ -16,6 +16,7 @@ export default function Home() {
   const today = format(new Date(), "yyyy-MM-dd");
   const { data: user } = useUser();
   const { data: dailyLog, isLoading: logLoading } = useDailyLog(today);
+  const { data: dailyLogs } = useDailyLogs();
   const { data: meals, isLoading: mealsLoading } = useMeals(); // Fetch all for calendar
   const { data: pantry } = usePantryItems();
   const { data: reminders } = useReminders();
@@ -155,8 +156,9 @@ export default function Home() {
             <div className="grid grid-cols-7 gap-1">
               {days.map(day => {
                 const dateStr = format(day, "yyyy-MM-dd");
-                const hasCycle = false; // logic for cycle dots
-                const hasToilet = dailyLog?.date === dateStr && dailyLog.defecated;
+                const logsForDay = dailyLogs?.filter(l => l.date === dateStr);
+                const hasToilet = logsForDay?.some(l => l.defecated);
+                const hasCycle = logsForDay?.some(l => l.menstrualPhase === "menstrual");
                 
                 return (
                   <div key={dateStr} className="aspect-square flex flex-col items-center justify-center relative rounded-lg hover:bg-muted/50 transition-colors">
