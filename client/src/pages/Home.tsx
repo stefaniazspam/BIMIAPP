@@ -1,4 +1,4 @@
-import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addHours } from "date-fns";
 import { it } from "date-fns/locale";
 import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, usePantryItems, useReminders, useUser, useUpdateUser } from "@/hooks/use-bimi";
 import { Card } from "@/components/ui/card";
@@ -172,7 +172,7 @@ export default function Home() {
                   {reminder.title}
                 </p>
                 <p className="text-[10px] text-muted-foreground">
-                  {format(new Date(reminder.remindAt), "HH:mm", { locale: it })}
+                  {new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' }).format(new Date(reminder.remindAt))}
                 </p>
               </div>
             </div>
