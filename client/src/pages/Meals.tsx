@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { it } from "date-fns/locale";
-import { useDailyLog, useUpsertDailyLog, useMeals, useDeleteMeal, useGenerateMeal, useAddToShoppingList } from "@/hooks/use-bimi";
+import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, useDeleteMeal, useGenerateMeal, useAddToShoppingList, useCreateMeal } from "@/hooks/use-bimi";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Trash2, Utensils, Coffee, Apple, Moon, ChefHat, ShoppingCart, Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { Plus, Trash2, Utensils, Coffee, Apple, Moon, ChefHat, ShoppingCart, Loader2, Search, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -18,11 +18,16 @@ export default function Meals() {
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
   
   const { data: meals } = useMeals();
+  const { data: dailyLogs } = useDailyLogs();
   const deleteMeal = useDeleteMeal();
   const generateMeal = useGenerateMeal();
+  const createMeal = useCreateMeal();
   const addToShoppingList = useAddToShoppingList();
 
   const [isGenOpen, setIsGenOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ date: string, type: string } | null>(null);
   const [genPrompt, setGenPrompt] = useState("");
   const [servings, setServings] = useState(2);
@@ -56,67 +61,115 @@ export default function Meals() {
     }
   };
 
+  const handleSmartSearch = async () => {
+    setIsSearching(true);
+    try {
+      const res = await fetch("/api/recipes/search", { method: "POST" });
+      const data = await res.json();
+      setSearchResults(data.recipes || []);
+      setIsSearchOpen(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleAddFromSearch = async (recipe: any) => {
+    if (!selectedSlot) return;
+    await createMeal.mutateAsync({
+      userId: 1,
+      date: selectedSlot.date,
+      mealType: selectedSlot.type,
+      name: recipe.name,
+      recipe: recipe.recipe,
+      ingredients: recipe.ingredients,
+      servings: 2,
+      isPlanned: true
+    });
+    setIsSearchOpen(false);
+    setIsGenOpen(false);
+  };
+
   return (
-    <div className="space-y-8 pb-24 max-w-7xl mx-auto px-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-4 pb-24 max-w-7xl mx-auto px-2">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
         <div>
-          <h1 className="text-4xl font-display font-bold text-primary">Piano Alimentare</h1>
-          <p className="text-muted-foreground">Settimana del {format(startDate, "d MMMM", { locale: it })}</p>
+          <h1 className="text-3xl font-display font-bold text-primary">Piano Bimì</h1>
+          <p className="text-xs text-muted-foreground">Settimana del {format(startDate, "d MMMM", { locale: it })}</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setCurrentWeek(addDays(currentWeek, -7))}>Precedente</Button>
-          <Button variant="outline" onClick={() => setCurrentWeek(new Date())}>Oggi</Button>
-          <Button variant="outline" onClick={() => setCurrentWeek(addDays(currentWeek, 7))}>Successiva</Button>
+        <div className="flex gap-1">
+          <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setCurrentWeek(addDays(currentWeek, -7))}>Sett. Scorsa</Button>
+          <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setCurrentWeek(new Date())}>Oggi</Button>
+          <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setCurrentWeek(addDays(currentWeek, 7))}>Prossima</Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-7 gap-1">
         {weekDays.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
+          const logsForDay = (dailyLogs as any[])?.filter((l: any) => l.date === dateStr);
+          const hasToilet = logsForDay?.some((l: any) => l.defecated);
+          const hasCycle = logsForDay?.some((l: any) => l.menstrualPhase === "menstrual");
+
           return (
-            <div key={dateStr} className="space-y-4">
-              <div className="text-center pb-2 border-b border-border">
-                <p className="text-xs font-bold uppercase text-muted-foreground tracking-tighter">
-                  {format(day, "EEEE", { locale: it })}
-                </p>
-                <p className="text-lg font-display font-bold">
-                  {format(day, "d")}
-                </p>
+            <div key={dateStr} className="space-y-2">
+              <div className="text-center pb-1 border-b border-border flex items-center justify-center gap-1">
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-tighter leading-none">
+                    {format(day, "EEE", { locale: it })}
+                  </p>
+                  <p className="text-sm font-display font-bold leading-none mt-1">
+                    {format(day, "d")}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {hasToilet && <div className="w-1.5 h-1.5 rounded-full bg-green-500" />}
+                  {hasCycle && <div className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+                </div>
               </div>
 
               {mealTypes.map((type) => {
-                const dayMeal = meals?.find(m => m.date === dateStr && m.mealType === type.id);
+                const dayMeals = meals?.filter(m => m.date === dateStr && m.mealType === type.id);
                 
                 return (
-                  <Card key={type.id} className="p-2 min-h-[100px] flex flex-col justify-between group relative border-muted/50 hover:border-primary/50 transition-colors">
-                    <div className="flex items-center gap-1 mb-1">
-                      <type.icon className={`w-3 h-3 ${type.color}`} />
-                      <span className="text-[10px] font-bold uppercase text-muted-foreground">{type.label}</span>
+                  <Card key={type.id} className="p-1 min-h-[40px] flex flex-col justify-between group relative border-muted/30 hover:border-primary/50 transition-colors rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-1">
+                      <type.icon className={`w-2 h-2 ${type.color}`} />
+                      <span className="text-[8px] font-bold uppercase text-muted-foreground/70">{type.label}</span>
                     </div>
 
-                    {dayMeal ? (
-                      <div className="space-y-2">
-                        <p className="text-xs font-bold line-clamp-2 cursor-pointer hover:text-primary" onClick={() => setViewRecipe(dayMeal)}>
-                          {dayMeal.name}
-                        </p>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute top-1 right-1">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={() => deleteMeal.mutate(dayMeal.id)}>
-                            <Trash2 className="w-3 h-3" />
+                    <div className="space-y-1 mt-1">
+                      {dayMeals?.map((meal: any) => (
+                        <div key={meal.id} className="relative group/meal">
+                          <p className="text-[10px] font-bold line-clamp-1 cursor-pointer leading-tight pr-4 hover:text-primary" onClick={() => setViewRecipe(meal)}>
+                            {meal.name}
+                          </p>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-4 w-4 text-destructive p-0 absolute top-0 right-0 opacity-0 group-hover/meal:opacity-100 transition-opacity" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteMeal.mutate(meal.id);
+                            }}
+                          >
+                            <Trash2 className="w-2.5 h-2.5" />
                           </Button>
                         </div>
-                      </div>
-                    ) : (
+                      ))}
+                      
                       <Button 
                         variant="ghost" 
-                        className="w-full h-12 dashed border-2 border-dashed border-muted hover:border-primary/30 text-muted-foreground hover:text-primary p-0"
+                        className="w-full h-6 border-dashed border border-muted/50 hover:border-primary/30 p-0 mt-1"
                         onClick={() => {
                           setSelectedSlot({ date: dateStr, type: type.id });
                           setIsGenOpen(true);
                         }}
                       >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-3 h-3 text-muted-foreground/50" />
                       </Button>
-                    )}
+                    </div>
                   </Card>
                 );
               })}
@@ -173,10 +226,41 @@ export default function Meals() {
               </div>
             </div>
 
-            <Button onClick={handleGenerate} className="w-full rounded-xl h-12 font-bold text-lg" disabled={generateMeal.isPending}>
-              {generateMeal.isPending ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <ChefHat className="w-5 h-5 mr-2" />}
-              Genera Pasto
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button onClick={handleGenerate} className="w-full rounded-xl h-12 font-bold" disabled={generateMeal.isPending}>
+                {generateMeal.isPending ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Sparkles className="w-5 h-5 mr-2" />}
+                Genera con AI
+              </Button>
+              <Button variant="outline" onClick={handleSmartSearch} className="w-full rounded-xl h-12 border-primary/30 text-primary" disabled={isSearching}>
+                {isSearching ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Search className="w-5 h-5 mr-2" />}
+                Cerca in Dispensa
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Smart Search Results */}
+      <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[80vh] overflow-y-auto rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl flex items-center gap-2">
+              <Sparkles className="text-primary" />
+              Idee dalla tua dispensa
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {searchResults.map((res, i) => (
+              <Card key={i} className="p-4 border-primary/10 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => handleAddFromSearch(res)}>
+                <h4 className="font-bold text-lg text-primary">{res.name}</h4>
+                <p className="text-sm text-muted-foreground mt-1">{res.description}</p>
+                <div className="flex flex-wrap gap-1 mt-3">
+                  {res.ingredients?.slice(0, 4).map((ing: string) => (
+                    <span key={ing} className="text-[10px] bg-primary/5 text-primary px-2 py-0.5 rounded-full">{ing}</span>
+                  ))}
+                </div>
+              </Card>
+            ))}
           </div>
         </DialogContent>
       </Dialog>

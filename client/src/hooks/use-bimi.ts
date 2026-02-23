@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
+import { z } from "zod";
 import { 
   type InsertDailyLog, type InsertMeal, type InsertPantryItem, 
   type InsertShoppingListItem, type InsertReminder, type InsertUser,
@@ -44,7 +45,17 @@ export function useDailyLogs() {
     queryFn: async () => {
       const res = await fetch("/api/daily-logs", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch daily logs");
-      return res.json();
+      const data = await res.json();
+      return z.array(z.object({
+        id: z.number(),
+        userId: z.number(),
+        date: z.string(),
+        menstrualPhase: z.string().nullable(),
+        flow: z.string().nullable(),
+        intercourse: z.boolean().nullable(),
+        defecated: z.boolean().nullable(),
+        notes: z.string().nullable(),
+      })).parse(data);
     },
   });
 }

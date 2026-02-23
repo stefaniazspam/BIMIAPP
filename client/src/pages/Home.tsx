@@ -128,7 +128,13 @@ export default function Home() {
               <div key={meal.id} className="bg-card p-4 rounded-xl shadow-sm border border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <ChefHat className="w-4 h-4 text-primary" />
-                  <p className="font-bold text-sm">{meal.name}</p>
+                  <div>
+                    <p className="font-bold text-sm">{meal.name}</p>
+                    <div className="flex gap-1 mt-1">
+                      {dailyLog?.defecated && <div className="w-2 h-2 rounded-full bg-green-500" title="Toilette Check" />}
+                      {dailyLog?.menstrualPhase === "menstrual" && <div className="w-2 h-2 rounded-full bg-red-500" title="Ciclo" />}
+                    </div>
+                  </div>
                 </div>
                 <ArrowRight className="w-4 h-4 text-primary" />
               </div>
@@ -136,6 +142,48 @@ export default function Home() {
           </div>
         )}
       </Card>
+
+      <div className="space-y-3">
+        <h3 className="font-display font-bold text-lg text-primary flex items-center gap-2">
+          <AlertCircle className="w-5 h-5" />
+          Promemoria e Scadenze di Oggi
+        </h3>
+        
+        <div className="grid gap-3">
+          {/* Expiring food */}
+          {pantry?.filter(item => {
+            if (!item.expirationDate) return false;
+            return item.expirationDate === today;
+          }).map(item => (
+            <div key={`food-${item.id}`} className="bg-red-50 dark:bg-red-900/10 border border-red-100 p-4 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+                <p className="font-bold text-sm">SCADE OGGI: {item.name}</p>
+              </div>
+            </div>
+          ))}
+
+          {/* Today's reminders */}
+          {reminders?.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") === today).map(reminder => (
+            <div key={`rem-${reminder.id}`} className="bg-card p-4 rounded-xl shadow-sm border border-border flex items-center gap-3">
+              <CheckCircle2 className={`w-5 h-5 ${reminder.completed ? 'text-primary' : 'text-muted-foreground'}`} />
+              <div className="flex-1">
+                <p className={`font-medium text-sm ${reminder.completed ? 'line-through text-muted-foreground' : ''}`}>
+                  {reminder.title}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {format(new Date(reminder.remindAt), "HH:mm", { locale: it })}
+                </p>
+              </div>
+            </div>
+          ))}
+
+          {(!reminders?.some(r => format(new Date(r.remindAt), "yyyy-MM-dd") === today) && 
+            !pantry?.some(i => i.expirationDate === today)) && (
+            <p className="text-sm text-muted-foreground text-center py-4">Nulla in scadenza oggi</p>
+          )}
+        </div>
+      </div>
 
       {/* Calendar Dialog */}
       <Dialog open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
@@ -156,9 +204,9 @@ export default function Home() {
             <div className="grid grid-cols-7 gap-1">
               {days.map(day => {
                 const dateStr = format(day, "yyyy-MM-dd");
-                const logsForDay = dailyLogs?.filter(l => l.date === dateStr);
-                const hasToilet = logsForDay?.some(l => l.defecated);
-                const hasCycle = logsForDay?.some(l => l.menstrualPhase === "menstrual");
+                const logsForDay = (dailyLogs as any[])?.filter((l: any) => l.date === dateStr);
+                const hasToilet = logsForDay?.some((l: any) => l.defecated);
+                const hasCycle = logsForDay?.some((l: any) => l.menstrualPhase === "menstrual");
                 
                 return (
                   <div key={dateStr} className="aspect-square flex flex-col items-center justify-center relative rounded-lg hover:bg-muted/50 transition-colors">

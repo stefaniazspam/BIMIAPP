@@ -1,3 +1,6 @@
+import { db } from "./db";
+import { users, dailyLogs, meals, pantryItems, shoppingListItems, reminders } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
@@ -34,7 +37,7 @@ export async function registerRoutes(
       
       const systemPrompt = `
 Sei Bimì, un'assistente AI per l'app Bimì. Il tuo scopo è aiutare l'utente a organizzare il tempo, promemoria, pasti e lista della spesa.
-Oggi è ${todayStr}.
+Oggi è ${todayStr}, ore ${new Date().toLocaleTimeString('it-IT')}.
 
 Dispensa attuale: ${JSON.stringify(pantry)}. Se l'utente chiede cosa mangiare, suggerisci ricette usando questi ingredienti.
 Promemoria attuali: ${JSON.stringify(reminders)}.
@@ -42,7 +45,7 @@ Calorie consumate oggi: ${calories} kcal.
 
 Rispondi sempre in modo breve, amichevole e utile in italiano.
 Se l'utente chiede di aggiungere qualcosa alla lista della spesa, usa la funzione "add_shopping_list_item".
-Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
+Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il parametro "remindAt", calcola sempre l'orario esatto basandoti sull'ora corrente fornita sopra. Se dice "tra 5 minuti", aggiungi 5 minuti all'ora corrente.
 `;
 
       const tools = [
@@ -76,12 +79,12 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
           type: "function" as const,
           function: {
             name: "add_reminder",
-            description: "Aggiungi un promemoria (es: fra 3 ore, domani alle 15, ecc)",
+            description: "Aggiungi un promemoria (es: fra 5 minuti, domani alle 15, ecc). Calcola sempre l'orario esatto basandoti sull'ora corrente.",
             parameters: {
               type: "object",
               properties: {
                 title: { type: "string" },
-                remindAt: { type: "string", description: "ISO 8601 date string for the exact reminder time" }
+                remindAt: { type: "string", description: "ISO 8601 date string for the exact reminder time. If the user says 'tra X minuti', calculate NOW + X minutes." }
               },
               required: ["title", "remindAt"]
             }
@@ -90,7 +93,7 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
       ];
 
       const response = await openai.chat.completions.create({
-        model: "gpt-5.1",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage }
@@ -121,13 +124,29 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
             finalResponse = "Ho svuotato completamente la tua lista della spesa.";
           } else if (toolCall.type === 'function' && toolCall.function.name === "add_reminder") {
             const args = JSON.parse(toolCall.function.arguments);
+            // Handle relative time like "tra 5 minuti" or absolute ISO string
+            let remindDate: Date;
+            if (args.remindAt.includes('minutes') || args.remindAt.match(/^\d+$/)) {
+               const mins = parseInt(args.remindAt);
+               remindDate = new Date(Date.now() + mins * 60000);
+            } else {
+               remindDate = new Date(args.remindAt);
+            }
+            
+            if (isNaN(remindDate.getTime())) {
+              // Fallback for LLM hallucinating relative text
+              const minsMatch = args.remindAt.match(/(\d+)/);
+              const mins = minsMatch ? parseInt(minsMatch[0]) : 5;
+              remindDate = new Date(Date.now() + mins * 60000);
+            }
+
             await storage.createReminder({
               userId: 1,
               title: args.title,
-              remindAt: new Date(args.remindAt),
+              remindAt: remindDate,
               completed: false
             });
-            finalResponse = `Perfetto, ti ricorderò: "${args.title}" il ${new Date(args.remindAt).toLocaleString('it-IT')}.`;
+            finalResponse = `Perfetto, ti ricorderò: "${args.title}" il ${remindDate.toLocaleString('it-IT')}.`;
           }
         }
       }
@@ -368,13 +387,45 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder".
         ingredients: content.ingredients,
         servings: servings,
         isPlanned: true,
-        calories: 0 // No longer calculating macros as per request
+        calories: 0 
       });
 
       res.json(meal);
     } catch (err) {
       console.error(err);
-      res.status(500).json({ message: "Errore generazione pasto" });
+      res.status(500).json({ message: "Errore generazione pasto: " + (err instanceof Error ? err.message : String(err)) });
+    }
+  });
+
+  app.post("/api/recipes/search", async (req, res) => {
+    try {
+      const pantry = await storage.getPantryItems();
+      const ingredients = pantry.map(i => `${i.name} (${i.category})`).join(", ");
+      
+      const systemPrompt = `Sei Bimì, un'assistente culinaria esperta. 
+      L'utente ha questi ingredienti in dispensa/frigo/freezer: ${ingredients}.
+      Suggerisci 3 ricette creative che valorizzino questi ingredienti, minimizzando gli sprechi.
+      Rispondi ESCLUSIVAMENTE con un oggetto JSON nel formato:
+      {
+        "recipes": [
+          {
+            "name": "Titolo",
+            "description": "Breve descrizione",
+            "ingredients": ["ingrediente 1", "ingrediente 2"],
+            "recipe": "Procedimento..."
+          }
+        ]
+      }`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "system", content: systemPrompt }],
+        response_format: { type: "json_object" }
+      });
+
+      res.json(JSON.parse(response.choices[0].message.content || "{}"));
+    } catch (err) {
+      res.status(500).json({ message: "Errore ricerca ricette" });
     }
   });
 

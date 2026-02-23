@@ -95,7 +95,9 @@ export type ShoppingListItem = typeof shoppingListItems.$inferSelect;
 export type InsertShoppingListItem = z.infer<typeof insertShoppingListItemSchema>;
 export type UpdateShoppingListItemRequest = Partial<InsertShoppingListItem>;
 
-export const insertReminderSchema = createInsertSchema(reminders).omit({ id: true });
+export const insertReminderSchema = createInsertSchema(reminders, {
+  remindAt: z.string().or(z.date()).transform(v => new Date(v))
+}).omit({ id: true });
 export type Reminder = typeof reminders.$inferSelect;
 export type InsertReminder = z.infer<typeof insertReminderSchema>;
 export type UpdateReminderRequest = Partial<InsertReminder>;
