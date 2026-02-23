@@ -27,6 +27,13 @@ export default function Home() {
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isNameEditing, setIsNameEditing] = useState(false);
+  const [newName, setNewName] = useState(user?.username || "Stefania");
+
+  const handleNameUpdate = () => {
+    updateUser.mutate({ username: newName });
+    setIsNameEditing(false);
+  };
 
   const handleDefecatedToggle = (checked: boolean) => {
     upsertLog.mutate({
@@ -57,7 +64,28 @@ export default function Home() {
     <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-display font-bold text-primary">Ciao, Stefania!</h1>
+          {isNameEditing ? (
+            <div className="flex items-center gap-2">
+              <Input 
+                value={newName} 
+                onChange={(e) => setNewName(e.target.value)}
+                className="text-2xl font-display font-bold text-primary h-10 w-48 bg-transparent border-b-2 border-primary rounded-none focus-visible:ring-0 px-0"
+                autoFocus
+                onBlur={handleNameUpdate}
+                onKeyDown={(e) => e.key === 'Enter' && handleNameUpdate()}
+              />
+            </div>
+          ) : (
+            <h1 
+              className="text-3xl font-display font-bold text-primary cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => {
+                setNewName(user?.username || "Stefania");
+                setIsNameEditing(true);
+              }}
+            >
+              Ciao, {user?.username || "Stefania"}!
+            </h1>
+          )}
           <p className="text-muted-foreground capitalize">
             {format(new Date(), "EEEE d MMMM", { locale: it })}
           </p>
