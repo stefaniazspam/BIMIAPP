@@ -200,7 +200,7 @@ export default function Home() {
                   {reminder.title}
                 </p>
                 <p className="text-[10px] text-muted-foreground">
-                  {new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' }).format(new Date(reminder.remindAt))}
+                  {new Date(reminder.remindAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' })}
                 </p>
               </div>
             </div>

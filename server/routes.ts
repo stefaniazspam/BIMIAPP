@@ -35,12 +35,13 @@ export async function registerRoutes(
       const mealsToday = await storage.getMeals(todayStr);
       const calories = mealsToday.reduce((sum, m) => sum + (m.calories || 0), 0);
       
-      const options = { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false } as const;
-      const currentTimeStr = new Intl.DateTimeFormat('it-IT', options).format(new Date());
+      // Use a more robust way to get Rome time
+      const romeTime = new Date().toLocaleString("it-IT", { timeZone: "Europe/Rome" });
+      const [romeDate, romeTimeOnly] = romeTime.split(", ");
       
       const systemPrompt = `
 Sei Bimì, un'assistente AI per l'app Bimì. Il tuo scopo è aiutare l'utente a organizzare il tempo, promemoria, pasti e lista della spesa.
-Oggi è ${todayStr}, ore locali (Roma) ${currentTimeStr}.
+Oggi è il ${romeDate}, ore locali (Roma) ${romeTimeOnly}.
 
 Dispensa attuale: ${JSON.stringify(pantry)}. Se l'utente chiede cosa mangiare, suggerisci ricette usando questi ingredienti.
 Promemoria attuali: ${JSON.stringify(reminders)}.
@@ -48,7 +49,7 @@ Calorie consumate oggi: ${calories} kcal.
 
 Rispondi sempre in modo breve, amichevole e utile in italiano.
 Se l'utente chiede di aggiungere qualcosa alla lista della spesa, usa la funzione "add_shopping_list_item".
-Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il parametro "remindAt", calcola sempre l'orario esatto basandoti sull'ora corrente di Roma fornita sopra (${currentTimeStr}). Se dice "tra 5 minuti", aggiungi 5 minuti a quell'orario.
+Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il parametro "remindAt", calcola sempre l'orario esatto basandoti sull'ora corrente di Roma fornita sopra (${romeTimeOnly}). Se dice "tra 5 minuti", aggiungi 5 minuti a quell'orario.
 `;
 
       const tools = [
