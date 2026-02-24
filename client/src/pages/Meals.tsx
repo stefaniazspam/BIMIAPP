@@ -72,8 +72,7 @@ export default function Meals() {
         date: selectedSlot.date,
         mealType: selectedSlot.type,
         servings,
-        usePantry,
-        subCategory: "altro" // Default for new meals
+        usePantry
       });
       setGenPrompt("");
       setIsGenOpen(false);
