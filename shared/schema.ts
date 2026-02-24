@@ -20,6 +20,7 @@ export const dailyLogs = pgTable("daily_logs", {
   flow: text("flow"), // 'light', 'medium', 'heavy'
   intercourse: boolean("intercourse").default(false),
   defecated: boolean("defecated").default(false),
+  waterIntake: integer("water_intake").default(0),
   notes: text("notes"),
 });
 

@@ -4,6 +4,7 @@ import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, usePantryItems,
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { differenceInDays, isToday, isTomorrow } from "date-fns";
+import { GlassWater } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
@@ -83,6 +84,16 @@ export default function Home() {
     });
   };
 
+  const handleWaterUpdate = (amount: number) => {
+    const currentWater = dailyLog?.waterIntake || 0;
+    upsertLog.mutate({
+      userId: 1,
+      date: today,
+      ...dailyLog,
+      waterIntake: Math.max(0, currentWater + amount)
+    });
+  };
+
   const monthStart = startOfMonth(calendarMonth);
   const monthEnd = endOfMonth(calendarMonth);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -156,6 +167,28 @@ export default function Home() {
                 className="w-6 h-6 border-2 border-primary data-[state=checked]:bg-primary"
               />
               <label htmlFor="defecated" className="text-sm font-medium cursor-pointer">Fatto?</label>
+            </div>
+          </div>
+
+          <div className="col-span-2 bg-white/50 dark:bg-black/20 p-4 rounded-xl backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <GlassWater className="w-4 h-4 text-primary" />
+                <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Acqua (Bicchieri)</span>
+              </div>
+              <span className="text-xl font-bold text-primary">{dailyLog?.waterIntake || 0}/8</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-2 bg-primary/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-300" 
+                  style={{ width: `${Math.min(100, ((dailyLog?.waterIntake || 0) / 8) * 100)}%` }}
+                />
+              </div>
+              <div className="flex gap-1">
+                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-primary/10 text-primary" onClick={() => handleWaterUpdate(-1)}>-</Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-primary text-primary-foreground" onClick={() => handleWaterUpdate(1)}>+</Button>
+              </div>
             </div>
           </div>
         </div>
