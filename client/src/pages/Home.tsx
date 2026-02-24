@@ -210,7 +210,6 @@ export default function Home() {
             </div>
           ))}
 
-          {/* Today's reminders */}
           {reminders?.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") === today).map(reminder => (
             <div key={`rem-${reminder.id}`} className="bg-card p-4 rounded-xl shadow-sm border border-border flex items-center gap-3 group">
               <Checkbox 
