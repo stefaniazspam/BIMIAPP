@@ -38,9 +38,13 @@ export default function Meals() {
   const [productSubCategory, setProductSubCategory] = useState("altro");
 
   const categories = [
-    { id: "panificati", label: "Panificati" },
+    { id: "panificati", label: "Pane e Farine" },
     { id: "carne", label: "Carne" },
     { id: "pesce", label: "Pesce" },
+    { id: "latticini", label: "Latticini e Uova" },
+    { id: "frutta_verdura", label: "Frutta e Verdura" },
+    { id: "conserve", label: "Conserve e Sughi" },
+    { id: "bevande", label: "Bevande" },
     { id: "altro", label: "Altro" }
   ];
   

@@ -91,18 +91,31 @@ export default function Pantry() {
 
   const getSortedShopping = () => {
     return (shoppingList || []).sort((a, b) => {
-      const priority: Record<string, number> = { panificati: 1, carne: 2, pesce: 3, altro: 4 };
-      const subA = priority[a.subCategory || "altro"] || 5;
-      const subB = priority[b.subCategory || "altro"] || 5;
+      const priority: Record<string, number> = { 
+        panificati: 1, 
+        carne: 2, 
+        pesce: 3, 
+        latticini: 4, 
+        frutta_verdura: 5, 
+        conserve: 6, 
+        bevande: 7, 
+        altro: 8 
+      };
+      const subA = priority[a.subCategory || "altro"] || 9;
+      const subB = priority[b.subCategory || "altro"] || 9;
       if (subA !== subB) return subA - subB;
       return a.name.localeCompare(b.name);
     });
   };
 
   const categories = [
-    { id: "panificati", label: "Panificati" },
+    { id: "panificati", label: "Pane e Farine" },
     { id: "carne", label: "Carne" },
     { id: "pesce", label: "Pesce" },
+    { id: "latticini", label: "Latticini e Uova" },
+    { id: "frutta_verdura", label: "Frutta e Verdura" },
+    { id: "conserve", label: "Conserve e Sughi" },
+    { id: "bevande", label: "Bevande" },
     { id: "altro", label: "Altro" }
   ];
 
@@ -111,7 +124,16 @@ export default function Pantry() {
       .filter(p => p.category === cat)
       .sort((a, b) => {
         // Sort by subCategory priority
-        const priority: Record<string, number> = { panificati: 1, carne: 2, pesce: 3, altro: 4 };
+        const priority: Record<string, number> = { 
+          panificati: 1, 
+          carne: 2, 
+          pesce: 3, 
+          latticini: 4, 
+          frutta_verdura: 5, 
+          conserve: 6, 
+          bevande: 7, 
+          altro: 8 
+        };
         const subA = priority[a.subCategory || "altro"] || 5;
         const subB = priority[b.subCategory || "altro"] || 5;
         if (subA !== subB) return subA - subB;
