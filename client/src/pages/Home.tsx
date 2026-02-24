@@ -3,6 +3,7 @@ import { it } from "date-fns/locale";
 import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, usePantryItems, useReminders, useUser, useUpdateUser } from "@/hooks/use-bimi";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { differenceInDays, isToday, isTomorrow } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
@@ -13,6 +14,19 @@ import { Link } from "wouter";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+
+const getExpirationLabel = (date: string) => {
+  const exp = new Date(date);
+  const today = new Date();
+  const diff = differenceInDays(exp, today);
+  
+  if (isToday(exp)) return "OGGI";
+  if (isTomorrow(exp)) return "DOMANI";
+  if (diff === 2) return "DOPODOMANI";
+  if (diff >= 3 && diff <= 6) return `FRA ${diff} GG`;
+  if (diff === 7) return "FRA 1 SETTIMANA";
+  return `IL ${format(exp, "dd/MM")}`;
+};
 
 export default function Home() {
   const today = format(new Date(), "yyyy-MM-dd");
@@ -203,7 +217,7 @@ export default function Home() {
               <div className="flex items-center gap-3">
                 <AlertCircle className={`w-5 h-5 ${item.expirationDate === today ? 'text-red-500' : 'text-orange-500'}`} />
                 <div>
-                  <p className="font-bold text-sm">{item.expirationDate === today ? 'SCADE OGGI' : `SCADE IL ${format(new Date(item.expirationDate!), "dd/MM")}`}: {item.name}</p>
+                  <p className="font-bold text-sm">SCADE {getExpirationLabel(item.expirationDate!)}: {item.name}</p>
                   <p className="text-[10px] text-muted-foreground capitalize">{item.subCategory || item.category}</p>
                 </div>
               </div>

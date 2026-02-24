@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, differenceInDays, isToday, isTomorrow } from "date-fns";
 import { usePantryItems, useCreatePantryItem, useDeletePantryItem, useShoppingList, useCreateShoppingItem, useUpdateShoppingItem, useDeleteShoppingItem } from "@/hooks/use-bimi";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -10,6 +10,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Refrigerator, Snowflake, Archive, ShoppingCart } from "lucide-react";
+
+const getExpirationLabel = (date: string) => {
+  const exp = new Date(date);
+  const today = new Date();
+  const diff = differenceInDays(exp, today);
+  
+  if (isToday(exp)) return "OGGI";
+  if (isTomorrow(exp)) return "DOMANI";
+  if (diff === 2) return "DOPODOMANI";
+  if (diff >= 3 && diff <= 6) return `FRA ${diff} GG`;
+  if (diff === 7) return "FRA 1 SETTIMANA";
+  return format(exp, "dd/MM/yyyy");
+};
 
 export default function Pantry() {
   const { data: pantry } = usePantryItems();
@@ -49,6 +62,21 @@ export default function Pantry() {
     setIsAddOpen(false);
   };
 
+  const [newShopItem, setNewShopItem] = useState({ name: "", subCategory: "altro" });
+
+  const handleAddShopping = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newShopItem.name.trim()) return;
+    await createShopping.mutateAsync({
+      userId: 1,
+      name: newShopItem.name,
+      subCategory: newShopItem.subCategory,
+      quantity: "1",
+      checked: false
+    });
+    setNewShopItem({ name: "", subCategory: "altro" });
+  };
+
   const handleUpdatePantry = async () => {
     if (!editingItem) return;
     await updatePantry.mutateAsync({
@@ -59,6 +87,16 @@ export default function Pantry() {
       subCategory: editingItem.subCategory
     });
     setEditingItem(null);
+  };
+
+  const getSortedShopping = () => {
+    return (shoppingList || []).sort((a, b) => {
+      const priority: Record<string, number> = { panificati: 1, carne: 2, pesce: 3, altro: 4 };
+      const subA = priority[a.subCategory || "altro"] || 5;
+      const subB = priority[b.subCategory || "altro"] || 5;
+      if (subA !== subB) return subA - subB;
+      return a.name.localeCompare(b.name);
+    });
   };
 
   const categories = [
@@ -148,7 +186,7 @@ export default function Pantry() {
                       </div>
                       {item.expirationDate && (
                         <p className={`text-xs ${new Date(item.expirationDate) < new Date() ? 'text-red-500 font-bold' : 'text-muted-foreground'}`}>
-                          Scade: {format(new Date(item.expirationDate), "dd/MM/yyyy")}
+                          Scade: {getExpirationLabel(item.expirationDate)}
                         </p>
                       )}
                     </div>
