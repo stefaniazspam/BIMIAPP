@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, dailyLogs, meals, pantryItems, shoppingListItems, reminders } from "@shared/schema";
+import { users, dailyLogs, meals, pantryItems, shoppingListItems, reminders, insertPantryItemSchema, insertShoppingListItemSchema, insertReminderSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import type { Express } from "express";
 import type { Server } from "http";
@@ -204,6 +204,39 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
   });
 
   // Meals
+  app.patch("/api/pantry/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const input = insertPantryItemSchema.partial().parse(req.body);
+      const updated = await storage.updatePantryItem(id, input);
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid update data" });
+    }
+  });
+
+  app.patch("/api/shopping/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const input = insertShoppingListItemSchema.partial().parse(req.body);
+      const updated = await storage.updateShoppingListItem(id, input);
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid update data" });
+    }
+  });
+
+  app.patch("/api/reminders/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const input = insertReminderSchema.partial().parse(req.body);
+      const updated = await storage.updateReminder(id, input);
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid update data" });
+    }
+  });
+
   app.get(api.meals.list.path, async (req, res) => {
     const date = req.query.date as string | undefined;
     const meals = await storage.getMeals(date);

@@ -1,6 +1,8 @@
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addHours } from "date-fns";
 import { it } from "date-fns/locale";
 import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, usePantryItems, useReminders, useUser, useUpdateUser } from "@/hooks/use-bimi";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
@@ -22,6 +24,17 @@ export default function Home() {
   const { data: reminders } = useReminders();
   const upsertLog = useUpsertDailyLog();
   const updateUser = useUpdateUser();
+  
+  const queryClient = useQueryClient();
+  const updateReminder = useMutation({
+    mutationFn: async ({ id, completed }: { id: number; completed: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/reminders/${id}`, { completed });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/reminders"] });
+    }
+  });
 
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -153,7 +166,7 @@ export default function Home() {
         ) : (
           <div className="grid gap-3">
             {meals?.filter(m => m.date === today && m.isPlanned).map(meal => (
-              <div key={meal.id} className="bg-card p-4 rounded-xl shadow-sm border border-border flex items-center justify-between">
+              <div key={meal.id} className="bg-card p-4 rounded-xl shadow-sm border border-border flex items-center justify-between cursor-pointer hover:border-primary/50 transition-colors" onClick={() => window.location.href = `/pasti?recipe=${meal.id}`}>
                 <div className="flex items-center gap-3">
                   <ChefHat className="w-4 h-4 text-primary" />
                   <div>
@@ -174,27 +187,37 @@ export default function Home() {
       <div className="space-y-3">
         <h3 className="font-display font-bold text-lg text-primary flex items-center gap-2">
           <AlertCircle className="w-5 h-5" />
-          Promemoria e Scadenze di Oggi
+          Prossimi Promemoria e Scadenze
         </h3>
         
         <div className="grid gap-3">
-          {/* Expiring food */}
           {pantry?.filter(item => {
             if (!item.expirationDate) return false;
-            return item.expirationDate === today;
-          }).map(item => (
-            <div key={`food-${item.id}`} className="bg-red-50 dark:bg-red-900/10 border border-red-100 p-4 rounded-xl flex items-center justify-between">
+            const expDate = new Date(item.expirationDate);
+            const todayDate = new Date(today);
+            const threeDaysFromNow = addDays(todayDate, 3);
+            return expDate >= todayDate && expDate <= threeDaysFromNow;
+          }).sort((a, b) => (a.expirationDate || "").localeCompare(b.expirationDate || ""))
+          .map(item => (
+            <div key={`food-${item.id}`} className={`border p-4 rounded-xl flex items-center justify-between ${item.expirationDate === today ? 'bg-red-50 dark:bg-red-900/10 border-red-100' : 'bg-orange-50 dark:bg-orange-900/10 border-orange-100'}`}>
               <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-red-500" />
-                <p className="font-bold text-sm">SCADE OGGI: {item.name}</p>
+                <AlertCircle className={`w-5 h-5 ${item.expirationDate === today ? 'text-red-500' : 'text-orange-500'}`} />
+                <div>
+                  <p className="font-bold text-sm">{item.expirationDate === today ? 'SCADE OGGI' : `SCADE IL ${format(new Date(item.expirationDate!), "dd/MM")}`}: {item.name}</p>
+                  <p className="text-[10px] text-muted-foreground capitalize">{item.subCategory || item.category}</p>
+                </div>
               </div>
             </div>
           ))}
 
           {/* Today's reminders */}
           {reminders?.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") === today).map(reminder => (
-            <div key={`rem-${reminder.id}`} className="bg-card p-4 rounded-xl shadow-sm border border-border flex items-center gap-3">
-              <CheckCircle2 className={`w-5 h-5 ${reminder.completed ? 'text-primary' : 'text-muted-foreground'}`} />
+            <div key={`rem-${reminder.id}`} className="bg-card p-4 rounded-xl shadow-sm border border-border flex items-center gap-3 group">
+              <Checkbox 
+                checked={reminder.completed || false} 
+                onCheckedChange={(checked) => updateReminder.mutate({ id: reminder.id, completed: !!checked })}
+                className="w-5 h-5 border-2 border-primary data-[state=checked]:bg-primary"
+              />
               <div className="flex-1">
                 <p className={`font-medium text-sm ${reminder.completed ? 'line-through text-muted-foreground' : ''}`}>
                   {reminder.title}

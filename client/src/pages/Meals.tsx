@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { it } from "date-fns/locale";
 import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, useDeleteMeal, useGenerateMeal, useAddToShoppingList, useCreateMeal } from "@/hooks/use-bimi";
@@ -23,6 +23,7 @@ export default function Meals() {
   const generateMeal = useGenerateMeal();
   const createMeal = useCreateMeal();
   const addToShoppingList = useAddToShoppingList();
+  const createPantryItem = useCreatePantryItem();
 
   const [isGenOpen, setIsGenOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -32,8 +33,27 @@ export default function Meals() {
   const [genPrompt, setGenPrompt] = useState("");
   const [servings, setServings] = useState(2);
   const [usePantry, setUsePantry] = useState(false);
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [productToCategory, setProductToCategory] = useState<{ name: string, category: string }>({ name: "", category: "dispensa" });
+  const [productSubCategory, setProductSubCategory] = useState("altro");
+
+  const categories = [
+    { id: "panificati", label: "Panificati" },
+    { id: "carne", label: "Carne" },
+    { id: "pesce", label: "Pesce" },
+    { id: "altro", label: "Altro" }
+  ];
   
   const [viewRecipe, setViewRecipe] = useState<any>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const recipeId = params.get('recipe');
+    if (recipeId && meals) {
+      const meal = meals.find(m => m.id === Number(recipeId));
+      if (meal) setViewRecipe(meal);
+    }
+  }, [meals]);
   const [isSelectIngOpen, setIsSelectIngOpen] = useState(false);
   const [selectedIngs, setSelectedIngs] = useState<string[]>([]);
 
@@ -52,7 +72,8 @@ export default function Meals() {
         date: selectedSlot.date,
         mealType: selectedSlot.type,
         servings,
-        usePantry
+        usePantry,
+        subCategory: "altro" // Default for new meals
       });
       setGenPrompt("");
       setIsGenOpen(false);
@@ -139,7 +160,7 @@ export default function Meals() {
                       <span className="text-[8px] font-bold uppercase text-muted-foreground/70">{type.label}</span>
                     </div>
 
-                    <div className="space-y-1 mt-1">
+                    <div className="space-y-1 mt-1 flex-1">
                       {dayMeals?.map((meal: any) => (
                         <div key={meal.id} className="relative group/meal">
                           <p className="text-[10px] font-bold line-clamp-1 cursor-pointer leading-tight pr-4 hover:text-primary" onClick={() => setViewRecipe(meal)}>
@@ -158,18 +179,18 @@ export default function Meals() {
                           </Button>
                         </div>
                       ))}
-                      
-                      <Button 
-                        variant="ghost" 
-                        className="w-full h-6 border-dashed border border-muted/50 hover:border-primary/30 p-0 mt-1"
-                        onClick={() => {
-                          setSelectedSlot({ date: dateStr, type: type.id });
-                          setIsGenOpen(true);
-                        }}
-                      >
-                        <Plus className="w-3 h-3 text-muted-foreground/50" />
-                      </Button>
                     </div>
+                    
+                    <Button 
+                      variant="ghost" 
+                      className="w-6 h-6 border-dashed border border-muted/50 hover:border-primary/30 p-0 absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => {
+                        setSelectedSlot({ date: dateStr, type: type.id });
+                        setIsGenOpen(true);
+                      }}
+                    >
+                      <Plus className="w-3 h-3 text-muted-foreground/50" />
+                    </Button>
                   </Card>
                 );
               })}
@@ -297,6 +318,22 @@ export default function Meals() {
               </Button>
             </div>
 
+            <div className="flex justify-end">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-xl border-primary/20 text-primary"
+                onClick={() => {
+                  setProductToCategory({ name: viewRecipe.name, category: "frigo" });
+                  setProductSubCategory("altro");
+                  setIsAddProductOpen(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Aggiungi piatto pronto alla dispensa
+              </Button>
+            </div>
+
             <div>
               <h4 className="font-bold flex items-center gap-2 mb-3">
                 <ChefHat className="w-4 h-4 text-primary" /> Procedimento
@@ -311,36 +348,55 @@ export default function Meals() {
 
       {/* Ingredient Selector Dialog */}
       <Dialog open={isSelectIngOpen} onOpenChange={setIsSelectIngOpen}>
+        {/* ... existing dialog content ... */}
+      </Dialog>
+
+      {/* Add Product Category Dialog */}
+      <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
         <DialogContent className="sm:max-w-md rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="font-display text-xl">Seleziona ingredienti</DialogTitle>
+            <DialogTitle className="font-display text-xl">In quale categoria?</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="grid gap-2">
-              {viewRecipe?.ingredients?.map((ing: string) => (
-                <div key={ing} className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl">
-                  <Checkbox 
-                    id={ing} 
-                    checked={selectedIngs.includes(ing)}
-                    onCheckedChange={(checked) => {
-                      if (checked) setSelectedIngs([...selectedIngs, ing]);
-                      else setSelectedIngs(selectedIngs.filter(i => i !== ing));
-                    }}
-                  />
-                  <label htmlFor={ing} className="text-sm font-medium">{ing}</label>
-                </div>
-              ))}
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-muted-foreground">Posizione</label>
+              <Select value={productToCategory.category} onValueChange={(v) => setProductToCategory({...productToCategory, category: v})}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dispensa">Dispensa</SelectItem>
+                  <SelectItem value="frigo">Frigorifero</SelectItem>
+                  <SelectItem value="freezer">Freezer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-muted-foreground">Tipo di prodotto</label>
+              <Select value={productSubCategory} onValueChange={setProductSubCategory}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <Button 
               className="w-full rounded-xl"
               onClick={async () => {
-                await addToShoppingList.mutateAsync(selectedIngs);
-                setIsSelectIngOpen(false);
-                setViewRecipe(null);
+                await createPantryItem.mutateAsync({
+                  userId: 1,
+                  name: productToCategory.name,
+                  category: productToCategory.category,
+                  subCategory: productSubCategory,
+                  quantity: "1",
+                  expirationDate: format(addDays(new Date(), 2), "yyyy-MM-dd")
+                });
+                setIsAddProductOpen(false);
               }}
-              disabled={addToShoppingList.isPending}
             >
-              Aggiungi {selectedIngs.length} elementi alla spesa
+              Conferma
             </Button>
           </div>
         </DialogContent>

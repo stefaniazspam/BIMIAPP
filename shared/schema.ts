@@ -47,7 +47,8 @@ export const pantryItems = pgTable("pantry_items", {
   userId: integer("user_id").notNull(),
   name: text("name").notNull(),
   category: text("category").notNull(), // 'dispensa', 'frigo', 'freezer'
-  quantity: integer("quantity").notNull().default(1),
+  subCategory: text("sub_category").notNull().default("altro"), // 'panificati', 'carne', 'pesce', 'altro'
+  quantity: text("quantity").notNull().default("1"),
   expirationDate: text("expiration_date"), // YYYY-MM-DD
 });
 
@@ -56,7 +57,8 @@ export const shoppingListItems = pgTable("shopping_list_items", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   name: text("name").notNull(),
-  quantity: integer("quantity").notNull().default(1),
+  quantity: text("quantity").notNull().default("1"),
+  subCategory: text("sub_category").notNull().default("altro"), // 'panificati', 'carne', 'pesce', 'altro'
   checked: boolean("checked").default(false),
 });
 
