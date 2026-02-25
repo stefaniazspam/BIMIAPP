@@ -1,12 +1,13 @@
 import { db } from "./db";
 import {
-  users, dailyLogs, meals, pantryItems, shoppingListItems, reminders,
+  users, dailyLogs, meals, pantryItems, shoppingListItems, reminders, pantryCategories,
   type User, type InsertUser,
   type DailyLog, type InsertDailyLog, type UpdateDailyLogRequest,
   type Meal, type InsertMeal, type UpdateMealRequest,
   type PantryItem, type InsertPantryItem, type UpdatePantryItemRequest,
   type ShoppingListItem, type InsertShoppingListItem, type UpdateShoppingListItemRequest,
-  type Reminder, type InsertReminder, type UpdateReminderRequest
+  type Reminder, type InsertReminder, type UpdateReminderRequest,
+  type PantryCategory, type InsertPantryCategory
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
@@ -42,6 +43,12 @@ export interface IStorage {
   createReminder(reminder: InsertReminder): Promise<Reminder>;
   updateReminder(id: number, updates: UpdateReminderRequest): Promise<Reminder>;
   deleteReminder(id: number): Promise<void>;
+
+  // Pantry Categories
+  getPantryCategories(userId: number): Promise<PantryCategory[]>;
+  createPantryCategory(category: InsertPantryCategory): Promise<PantryCategory>;
+  updatePantryCategory(id: number, updates: Partial<InsertPantryCategory>): Promise<PantryCategory>;
+  deletePantryCategory(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -150,6 +157,26 @@ export class DatabaseStorage implements IStorage {
 
   async deleteReminder(id: number): Promise<void> {
     await db.delete(reminders).where(eq(reminders.id, id));
+  }
+
+  // Pantry Categories
+  async getPantryCategories(userId: number): Promise<PantryCategory[]> {
+    return await db.select().from(pantryCategories).where(eq(pantryCategories.userId, userId)).orderBy(pantryCategories.order);
+  }
+
+  async createPantryCategory(category: InsertPantryCategory): Promise<PantryCategory> {
+    const [inserted] = await db.insert(pantryCategories).values(category).returning();
+    return inserted;
+  }
+
+  async updatePantryCategory(id: number, updates: Partial<InsertPantryCategory>): Promise<PantryCategory> {
+    const [updated] = await db.update(pantryCategories).set(updates).where(eq(pantryCategories.id, id)).returning();
+    if (!updated) throw new Error("Category not found");
+    return updated;
+  }
+
+  async deletePantryCategory(id: number): Promise<void> {
+    await db.delete(pantryCategories).where(eq(pantryCategories.id, id));
   }
 }
 

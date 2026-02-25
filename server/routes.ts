@@ -388,6 +388,27 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
     res.status(204).send();
   });
 
+  // Pantry Categories
+  app.get("/api/pantry-categories", async (req, res) => {
+    const categories = await storage.getPantryCategories(1);
+    res.json(categories);
+  });
+
+  app.post("/api/pantry-categories", async (req, res) => {
+    const category = await storage.createPantryCategory({ ...req.body, userId: 1 });
+    res.json(category);
+  });
+
+  app.patch("/api/pantry-categories/:id", async (req, res) => {
+    const category = await storage.updatePantryCategory(Number(req.params.id), req.body);
+    res.json(category);
+  });
+
+  app.delete("/api/pantry-categories/:id", async (req, res) => {
+    await storage.deletePantryCategory(Number(req.params.id));
+    res.status(204).end();
+  });
+
   app.post("/api/meals/generate", async (req, res) => {
     try {
       const { prompt, date, mealType, servings, usePantry } = req.body;
@@ -495,6 +516,24 @@ async function seedDatabase() {
     await storage.createUser({ username: "Stefania", password: "password", cycleDuration: 33, periodDuration: 5 });
   } else if (usersList.username !== "Stefania") {
     await storage.updateUser(1, { username: "Stefania", cycleDuration: 33 });
+  }
+
+  const defaultCategories = [
+    { name: "Panificati", icon: "Wheat", order: 0 },
+    { name: "Carne", icon: "Beef", order: 1 },
+    { name: "Pesce", icon: "Fish", order: 2 },
+    { name: "Latticini", icon: "Milk", order: 3 },
+    { name: "Frutta e Verdura", icon: "Leaf", order: 4 },
+    { name: "Conserve", icon: "Container", order: 5 },
+    { name: "Bevande", icon: "Beer", order: 6 },
+    { name: "Altro", icon: "HelpCircle", order: 7 }
+  ];
+
+  const existingCats = await storage.getPantryCategories(1);
+  if (existingCats.length === 0) {
+    for (const cat of defaultCategories) {
+      await storage.createPantryCategory({ ...cat, userId: 1 });
+    }
   }
 
   const items = await storage.getPantryItems();

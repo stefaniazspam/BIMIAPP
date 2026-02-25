@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { format, differenceInDays, isToday, isTomorrow } from "date-fns";
-import { usePantryItems, useCreatePantryItem, useDeletePantryItem, useShoppingList, useCreateShoppingItem, useUpdateShoppingItem, useDeleteShoppingItem } from "@/hooks/use-bimi";
+import { 
+  usePantryItems, useCreatePantryItem, useDeletePantryItem, 
+  useShoppingList, useCreateShoppingItem, useUpdateShoppingItem, useDeleteShoppingItem,
+  usePantryCategories, useCreatePantryCategory, useUpdatePantryCategory, useDeletePantryCategory 
+} from "@/hooks/use-bimi";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -9,7 +13,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Refrigerator, Snowflake, Archive, ShoppingCart } from "lucide-react";
+import { 
+  Plus, Trash2, Refrigerator, Snowflake, Archive, ShoppingCart, 
+  Settings, Calendar, Wheat, Beef, Fish, Milk, Leaf, Container, Beer, HelpCircle 
+} from "lucide-react";
+
+const ICON_MAP: Record<string, any> = {
+  Archive, Wheat, Beef, Fish, Milk, Leaf, Container, Beer, HelpCircle
+};
+
+const getCategoryIcon = (iconName: string) => {
+  const Icon = ICON_MAP[iconName] || HelpCircle;
+  return <Icon className="w-4 h-4" />;
+};
 
 const getExpirationLabel = (date: string) => {
   const exp = new Date(date);
@@ -26,6 +42,11 @@ const getExpirationLabel = (date: string) => {
 
 export default function Pantry() {
   const { data: pantry } = usePantryItems();
+  const { data: categories } = usePantryCategories();
+  const createCategory = useCreatePantryCategory();
+  const updateCategory = useUpdatePantryCategory();
+  const deleteCategory = useDeletePantryCategory();
+
   const queryClient = useQueryClient();
   const updatePantry = useMutation({
     mutationFn: async (item: any) => {
@@ -46,8 +67,12 @@ export default function Pantry() {
 
   const [activeTab, setActiveTab] = useState("dispensa");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showExpirationsOnly, setShowExpirationsOnly] = useState(false);
+  
   const [newItem, setNewItem] = useState({ name: "", quantity: "1", date: "", category: "dispensa", subCategory: "altro" });
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [newCategory, setNewCategory] = useState({ name: "", icon: "Archive" });
 
   const handleAddPantry = async () => {
     await createPantry.mutateAsync({
@@ -91,63 +116,100 @@ export default function Pantry() {
 
   const getSortedShopping = () => {
     return (shoppingList || []).sort((a, b) => {
-      const priority: Record<string, number> = { 
-        panificati: 1, 
-        carne: 2, 
-        pesce: 3, 
-        latticini: 4, 
-        frutta_verdura: 5, 
-        conserve: 6, 
-        bevande: 7, 
-        altro: 8 
-      };
-      const subA = priority[a.subCategory || "altro"] || 9;
-      const subB = priority[b.subCategory || "altro"] || 9;
-      if (subA !== subB) return subA - subB;
+      const catA = (categories || []).find(c => c.name === a.subCategory);
+      const catB = (categories || []).find(c => c.name === b.subCategory);
+      const orderA = catA?.order ?? 999;
+      const orderB = catB?.order ?? 999;
+      if (orderA !== orderB) return orderA - orderB;
       return a.name.localeCompare(b.name);
     });
   };
 
-  const categories = [
-    { id: "panificati", label: "Pane e Farine" },
-    { id: "carne", label: "Carne" },
-    { id: "pesce", label: "Pesce" },
-    { id: "latticini", label: "Latticini e Uova" },
-    { id: "frutta_verdura", label: "Frutta e Verdura" },
-    { id: "conserve", label: "Conserve e Sughi" },
-    { id: "bevande", label: "Bevande" },
-    { id: "altro", label: "Altro" }
-  ];
+  const groupedPantry = useMemo(() => {
+    const items = (pantry || []).filter(p => p.category === activeTab);
+    
+    if (showExpirationsOnly) {
+      return items
+        .filter(i => i.expirationDate)
+        .sort((a, b) => a.expirationDate!.localeCompare(b.expirationDate!));
+    }
 
-  const getSortedPantry = (cat: string) => {
-    return (pantry || [])
-      .filter(p => p.category === cat)
-      .sort((a, b) => {
-        // Sort by subCategory priority
-        const priority: Record<string, number> = { 
-          panificati: 1, 
-          carne: 2, 
-          pesce: 3, 
-          latticini: 4, 
-          frutta_verdura: 5, 
-          conserve: 6, 
-          bevande: 7, 
-          altro: 8 
-        };
-        const subA = priority[a.subCategory || "altro"] || 5;
-        const subB = priority[b.subCategory || "altro"] || 5;
-        if (subA !== subB) return subA - subB;
-        // Then by expiration date
-        if (!a.expirationDate) return 1;
-        if (!b.expirationDate) return -1;
-        return a.expirationDate.localeCompare(b.expirationDate);
-      });
-  };
+    const groups: Record<string, any[]> = {};
+    (categories || []).forEach(cat => {
+      groups[cat.name] = items
+        .filter(i => i.subCategory === cat.name)
+        .sort((a, b) => {
+          if (!a.expirationDate) return 1;
+          if (!b.expirationDate) return -1;
+          return a.expirationDate.localeCompare(b.expirationDate);
+        });
+    });
+
+    // Handle "Altro" or items without category
+    const otherItems = items.filter(i => !(categories || []).some(c => c.name === i.subCategory));
+    if (otherItems.length > 0) {
+      groups["Altro"] = otherItems;
+    }
+
+    return groups;
+  }, [pantry, activeTab, categories, showExpirationsOnly]);
 
   return (
     <div className="space-y-6 pb-20 h-full">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-display font-bold text-primary">Dispensa & Spesa</h1>
+        <h1 className="text-3xl font-display font-bold text-primary">Dispensa</h1>
+        <div className="flex gap-2">
+          <Button 
+            variant={showExpirationsOnly ? "default" : "outline"} 
+            size="sm" 
+            onClick={() => setShowExpirationsOnly(!showExpirationsOnly)}
+            className="rounded-xl flex items-center gap-2"
+          >
+            <Calendar className="w-4 h-4" />
+            <span className="hidden sm:inline">Scadenze</span>
+          </Button>
+          <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="icon" className="rounded-xl">
+                <Settings className="w-5 h-5" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="rounded-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Gestisci Categorie</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="flex gap-2">
+                  <Input placeholder="Nuova categoria" value={newCategory.name} onChange={e => setNewCategory({...newCategory, name: e.target.value})} className="rounded-xl" />
+                  <Select value={newCategory.icon} onValueChange={v => setNewCategory({...newCategory, icon: v})}>
+                    <SelectTrigger className="w-20 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(ICON_MAP).map(icon => (
+                        <SelectItem key={icon} value={icon}>{getCategoryIcon(icon)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={() => { createCategory.mutate({...newCategory, order: (categories?.length || 0)}); setNewCategory({name:"", icon:"Archive"}); }} className="rounded-xl">Add</Button>
+                </div>
+                <div className="space-y-2">
+                  {(categories || []).map(cat => (
+                    <div key={cat.id} className="flex items-center justify-between bg-muted/30 p-2 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        {getCategoryIcon(cat.icon)}
+                        <span className="font-medium">{cat.name}</span>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => deleteCategory.mutate(cat.id)} className="h-8 w-8 text-destructive">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Tabs defaultValue="dispensa" value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -178,11 +240,12 @@ export default function Pantry() {
                         <SelectValue placeholder="Categoria" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
+                        {(categories || []).map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                        <SelectItem value="altro">Altro</SelectItem>
                       </SelectContent>
                     </Select>
                     <div className="grid grid-cols-2 gap-4">
-                      <Input placeholder="Quantità (es: 2kg, 1 pacco)" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: e.target.value})} className="rounded-xl" />
+                      <Input placeholder="Quantità" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: e.target.value})} className="rounded-xl" />
                       <Input type="date" value={newItem.date} onChange={e => setNewItem({...newItem, date: e.target.value})} className="rounded-xl" />
                     </div>
                     <Button onClick={handleAddPantry} className="rounded-xl font-bold">Salva</Button>
@@ -193,31 +256,23 @@ export default function Pantry() {
           )}
 
           {["dispensa", "frigo", "freezer"].map(cat => (
-            <TabsContent key={cat} value={cat} className="space-y-3">
-              {getSortedPantry(cat).length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground bg-muted/10 rounded-2xl border-2 border-dashed border-muted/50">
-                  Vuoto! Aggiungi qualcosa.
+            <TabsContent key={cat} value={cat} className="space-y-6">
+              {showExpirationsOnly ? (
+                <div className="space-y-3">
+                  {(groupedPantry as any[]).map(item => (
+                    <PantryItemCard key={item.id} item={item} categories={categories} onDelete={() => deletePantry.mutate(item.id)} onEdit={() => setEditingItem(item)} />
+                  ))}
                 </div>
               ) : (
-                getSortedPantry(cat).map(item => (
-                  <div key={item.id} className="bg-card p-4 rounded-xl shadow-sm border border-border flex justify-between items-center group cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setEditingItem(item)}>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-bold">{item.name}</p>
-                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase font-bold">{item.subCategory}</span>
-                      </div>
-                      {item.expirationDate && (
-                        <p className={`text-xs ${new Date(item.expirationDate) < new Date() ? 'text-red-500 font-bold' : 'text-muted-foreground'}`}>
-                          Scade: {getExpirationLabel(item.expirationDate)}
-                        </p>
-                      )}
+                Object.entries(groupedPantry).map(([groupName, items]) => (
+                  <div key={groupName} className="space-y-3">
+                    <div className="flex items-center gap-2 border-b border-border/50 pb-1">
+                      {getCategoryIcon((categories || []).find(c => c.name === groupName)?.icon || "HelpCircle")}
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{groupName}</h3>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="bg-muted px-2 py-1 rounded-md text-xs font-mono">{item.quantity}</span>
-                      <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deletePantry.mutate(item.id); }} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full h-8 w-8">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    {(items as any[]).map(item => (
+                      <PantryItemCard key={item.id} item={item} categories={categories} onDelete={() => deletePantry.mutate(item.id)} onEdit={() => setEditingItem(item)} />
+                    ))}
                   </div>
                 ))
               )}
@@ -242,7 +297,7 @@ export default function Pantry() {
                   <SelectValue placeholder="Categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
+                  {(categories || []).map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </form>
@@ -260,7 +315,10 @@ export default function Pantry() {
                       <span className={item.checked ? "line-through text-muted-foreground" : "font-medium"}>
                         {item.name}
                       </span>
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold">{item.subCategory}</p>
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-bold">
+                        {getCategoryIcon((categories || []).find(c => c.name === item.subCategory)?.icon || "HelpCircle")}
+                        <span>{item.subCategory}</span>
+                      </div>
                     </div>
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => deleteShopping.mutate(item.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive rounded-full">
@@ -268,50 +326,60 @@ export default function Pantry() {
                   </Button>
                 </div>
               ))}
-              {shoppingList?.length === 0 && (
-                <p className="text-center text-muted-foreground text-sm py-8">La lista è vuota! 🎉</p>
-              )}
             </div>
           </TabsContent>
         </div>
       </Tabs>
 
-      {/* Edit Item Dialog */}
       <Dialog open={!!editingItem} onOpenChange={() => setEditingItem(null)}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Modifica {editingItem?.name}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase text-muted-foreground">Nome</label>
-              <Input value={editingItem?.name || ""} onChange={e => setEditingItem({...editingItem, name: e.target.value})} className="rounded-xl" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase text-muted-foreground">Categoria</label>
-              <Select value={editingItem?.subCategory || "altro"} onValueChange={v => setEditingItem({...editingItem, subCategory: v})}>
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            <Input value={editingItem?.name || ""} onChange={e => setEditingItem({...editingItem, name: e.target.value})} className="rounded-xl" />
+            <Select value={editingItem?.subCategory || "altro"} onValueChange={v => setEditingItem({...editingItem, subCategory: v})}>
+              <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(categories || []).map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-muted-foreground">Quantità</label>
-                <Input value={editingItem?.quantity || ""} onChange={e => setEditingItem({...editingItem, quantity: e.target.value})} className="rounded-xl" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-muted-foreground">Scadenza</label>
-                <Input type="date" value={editingItem?.expirationDate || ""} onChange={e => setEditingItem({...editingItem, expirationDate: e.target.value})} className="rounded-xl" />
-              </div>
+              <Input value={editingItem?.quantity || ""} onChange={e => setEditingItem({...editingItem, quantity: e.target.value})} className="rounded-xl" />
+              <Input type="date" value={editingItem?.expirationDate || ""} onChange={e => setEditingItem({...editingItem, expirationDate: e.target.value})} className="rounded-xl" />
             </div>
             <Button onClick={handleUpdatePantry} className="rounded-xl font-bold">Aggiorna</Button>
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function PantryItemCard({ item, categories, onDelete, onEdit }: { item: any, categories: any[], onDelete: () => void, onEdit: () => void }) {
+  const cat = categories.find(c => c.name === item.subCategory);
+  return (
+    <div className="bg-card p-4 rounded-xl shadow-sm border border-border flex justify-between items-center group cursor-pointer hover:border-primary/50 transition-colors" onClick={onEdit}>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <p className="font-bold">{item.name}</p>
+          <div className="flex items-center gap-1 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase font-bold">
+            {getCategoryIcon(cat?.icon || "HelpCircle")}
+            <span>{item.subCategory}</span>
+          </div>
+        </div>
+        {item.expirationDate && (
+          <p className={`text-xs ${new Date(item.expirationDate) < new Date() ? 'text-red-500 font-bold' : 'text-muted-foreground'}`}>
+            Scade: {getExpirationLabel(item.expirationDate)}
+          </p>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="bg-muted px-2 py-1 rounded-md text-xs font-mono">{item.quantity}</span>
+        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full h-8 w-8">
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
     </div>
   );
 }

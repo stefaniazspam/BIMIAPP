@@ -78,12 +78,10 @@ export const pantryCategories = pgTable("pantry_categories", {
   userId: integer("user_id").notNull(),
   name: text("name").notNull(),
   icon: text("icon").notNull().default("Package"),
-  order: integer("order").default(0),
+  order: integer("order").notNull().default(0),
 });
 
-export const insertPantryCategorySchema = createInsertSchema(pantryCategories).omit({ id: true });
-export type PantryCategory = typeof pantryCategories.$inferSelect;
-export type InsertPantryCategory = z.infer<typeof insertPantryCategorySchema>;
+// --- Schemas & Types ---
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -115,6 +113,10 @@ export const insertReminderSchema = createInsertSchema(reminders, {
 export type Reminder = typeof reminders.$inferSelect;
 export type InsertReminder = z.infer<typeof insertReminderSchema>;
 export type UpdateReminderRequest = Partial<InsertReminder>;
+
+export const insertPantryCategorySchema = createInsertSchema(pantryCategories).omit({ id: true });
+export type PantryCategory = typeof pantryCategories.$inferSelect;
+export type InsertPantryCategory = z.infer<typeof insertPantryCategorySchema>;
 
 export * from "./models/chat";
 

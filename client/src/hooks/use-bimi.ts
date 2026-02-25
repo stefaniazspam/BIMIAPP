@@ -381,6 +381,58 @@ export function useDeleteReminder() {
   });
 }
 
+// --- Pantry Categories ---
+export function usePantryCategories() {
+  return useQuery({
+    queryKey: ["/api/pantry-categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/pantry-categories");
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      return res.json();
+    },
+  });
+}
+
+export function useCreatePantryCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/pantry-categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/pantry-categories"] }),
+  });
+}
+
+export function useUpdatePantryCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: number } & any) => {
+      const res = await fetch(`/api/pantry-categories/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/pantry-categories"] }),
+  });
+}
+
+export function useDeletePantryCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      await fetch(`/api/pantry-categories/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/pantry-categories"] }),
+  });
+}
+
 // --- Chat ---
 export function useChat() {
   return useMutation({

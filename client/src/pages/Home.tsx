@@ -64,14 +64,13 @@ export default function Home() {
   };
 
   const handleDefecatedToggle = (checked: boolean) => {
+    const currentLog = dailyLog || {};
     upsertLog.mutate({
       userId: 1,
       date: today,
+      ...currentLog,
       defecated: checked,
-      ...dailyLog,
-      menstrualPhase: dailyLog?.menstrualPhase || null,
-      flow: dailyLog?.flow || null,
-      notes: dailyLog?.notes || null
+      waterIntake: currentLog.waterIntake || 0,
     });
   };
 
