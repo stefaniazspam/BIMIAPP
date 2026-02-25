@@ -48,7 +48,14 @@ export function BimiChat() {
   const handleMicClick = async () => {
     if (recorder.state === "recording") {
       const blob = await recorder.stopRecording();
-      await voiceStream.streamVoiceResponse(`/api/conversations/1/messages`, blob);
+      // Ensure we have a valid conversation before sending
+      let convId = 1;
+      try {
+        await voiceStream.streamVoiceResponse(`/api/conversations/${convId}/messages`, blob);
+      } catch (err) {
+        console.error("Voice stream error:", err);
+        setMessages(prev => [...prev, { role: 'assistant', text: "Scusa, non sono riuscita a sentirti bene. Riprova!" }]);
+      }
     } else {
       await recorder.startRecording();
     }

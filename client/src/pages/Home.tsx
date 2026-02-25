@@ -193,6 +193,39 @@ export default function Home() {
         </div>
       </Card>
 
+      {/* Reminders Widget */}
+      <Card className="p-6 shadow-md border-border/50 bg-white/50 dark:bg-black/20 backdrop-blur-sm">
+        <h2 className="text-lg font-bold font-display mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="w-5 h-5 text-primary" />
+            <span>Promemoria</span>
+          </div>
+          <Link href="/promemoria">
+            <Button variant="ghost" size="sm" className="text-xs text-primary font-bold">Vedi tutti</Button>
+          </Link>
+        </h2>
+        <div className="space-y-3">
+          {reminders?.filter(r => !r.completed).slice(0, 3).map(reminder => (
+            <div key={reminder.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors">
+              <Checkbox 
+                checked={reminder.completed} 
+                onCheckedChange={(checked) => updateReminder.mutate({ id: reminder.id, completed: !!checked })}
+                className="w-5 h-5 border-2 border-primary"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm truncate">{reminder.title}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {new Date(reminder.remindAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+          ))}
+          {(!reminders || reminders.filter(r => !r.completed).length === 0) && (
+            <p className="text-center text-sm text-muted-foreground py-2">Tutto fatto! 🎉</p>
+          )}
+        </div>
+      </Card>
+
       {/* Today's Meals */}
       <Card className="p-6 shadow-md border-border/50">
         <h2 className="text-lg font-bold font-display mb-4 flex items-center gap-2">
