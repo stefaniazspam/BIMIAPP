@@ -356,8 +356,8 @@ export default function Pantry() {
   );
 }
 
-function PantryItemCard({ item, categories, onDelete, onEdit }: { item: any, categories: any[], onDelete: () => void, onEdit: () => void }) {
-  const cat = categories.find(c => c.name === item.subCategory);
+function PantryItemCard({ item, categories, onDelete, onEdit }: { item: any, categories: any[] | undefined, onDelete: () => void, onEdit: () => void }) {
+  const cat = (categories || []).find(c => c.name === item.subCategory);
   return (
     <div className="bg-card p-4 rounded-xl shadow-sm border border-border flex justify-between items-center group cursor-pointer hover:border-primary/50 transition-colors" onClick={onEdit}>
       <div className="flex-1">
