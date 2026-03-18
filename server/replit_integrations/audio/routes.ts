@@ -57,6 +57,23 @@ export function registerAudioRoutes(app: Express): void {
     }
   });
 
+  // Transcribe audio only (no AI response) - returns text for input field
+  app.post("/api/transcribe", audioBodyParser, async (req: Request, res: Response) => {
+    try {
+      const { audio } = req.body;
+      if (!audio) {
+        return res.status(400).json({ error: "Audio data (base64) is required" });
+      }
+      const rawBuffer = Buffer.from(audio, "base64");
+      const { buffer: audioBuffer, format: inputFormat } = await ensureCompatibleFormat(rawBuffer);
+      const transcript = await speechToText(audioBuffer, inputFormat);
+      res.json({ text: transcript });
+    } catch (error) {
+      console.error("Error transcribing audio:", error);
+      res.status(500).json({ error: "Trascrizione non riuscita" });
+    }
+  });
+
   // Send voice message and get streaming audio response
   // Auto-detects audio format and converts WebM/MP4/OGG to WAV
   // Uses gpt-4o-mini-transcribe for STT, gpt-audio for voice response

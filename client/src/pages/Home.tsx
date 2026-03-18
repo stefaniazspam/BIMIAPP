@@ -266,7 +266,7 @@ export default function Home() {
       <div className="space-y-3">
         <h3 className="font-display font-bold text-lg text-primary flex items-center gap-2">
           <AlertCircle className="w-5 h-5" />
-          Prossimi Promemoria e Scadenze
+          Prossime Scadenze
         </h3>
         
         <div className="grid gap-3">
@@ -289,27 +289,14 @@ export default function Home() {
             </div>
           ))}
 
-          {reminders?.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") === today).map(reminder => (
-            <div key={`rem-${reminder.id}`} className="bg-card p-4 rounded-xl shadow-sm border border-border flex items-center gap-3 group">
-              <Checkbox 
-                checked={reminder.completed || false} 
-                onCheckedChange={(checked) => updateReminder.mutate({ id: reminder.id, completed: !!checked })}
-                className="w-5 h-5 border-2 border-primary data-[state=checked]:bg-primary"
-              />
-              <div className="flex-1">
-                <p className={`font-medium text-sm ${reminder.completed ? 'line-through text-muted-foreground' : ''}`}>
-                  {reminder.title}
-                </p>
-                <p className="text-[10px] text-muted-foreground">
-                  {new Date(reminder.remindAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' })}
-                </p>
-              </div>
-            </div>
-          ))}
-
-          {(!reminders?.some(r => format(new Date(r.remindAt), "yyyy-MM-dd") === today) && 
-            !pantry?.some(i => i.expirationDate === today)) && (
-            <p className="text-sm text-muted-foreground text-center py-4">Nulla in scadenza oggi</p>
+          {!pantry?.some(item => {
+            if (!item.expirationDate) return false;
+            const expDate = new Date(item.expirationDate);
+            const todayDate = new Date(today);
+            const threeDaysFromNow = addDays(todayDate, 3);
+            return expDate >= todayDate && expDate <= threeDaysFromNow;
+          }) && (
+            <p className="text-sm text-muted-foreground text-center py-4">Nulla in scadenza nei prossimi 3 giorni</p>
           )}
         </div>
       </div>

@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, Send, X, Bot, Sparkles, Mic, Square } from "lucide-react";
+import { Send, Bot, Mic, Square, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useChat } from "@/hooks/use-bimi";
-import { motion, AnimatePresence } from "framer-motion";
-import { useVoiceRecorder, useVoiceStream } from "@/replit_integrations/audio";
+import { motion } from "framer-motion";
+import { useVoiceRecorder } from "@/replit_integrations/audio";
 
 type Message = {
   role: 'user' | 'assistant';
@@ -16,28 +16,14 @@ type Message = {
 export function BimiChat() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', text: "Ciao! Sono Bimì, la tua assistente personale. Come posso aiutarti oggi?" }
   ]);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatMutation = useChat();
-
   const recorder = useVoiceRecorder();
-  const voiceStream = useVoiceStream({
-    onUserTranscript: (text) => {
-      setInput(prev => prev ? prev + " " + text : text);
-    },
-    onTranscript: (text, full) => {
-      setMessages(prev => {
-        const last = prev[prev.length - 1];
-        if (last && last.role === 'assistant') {
-          return [...prev.slice(0, -1), { role: 'assistant', text: full }];
-        }
-        return [...prev, { role: 'assistant', text: full }];
-      });
-    },
-  });
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -48,13 +34,30 @@ export function BimiChat() {
   const handleMicClick = async () => {
     if (recorder.state === "recording") {
       const blob = await recorder.stopRecording();
-      // Ensure we have a valid conversation before sending
-      let convId = 1;
+      if (!blob || blob.size === 0) return;
+      setIsTranscribing(true);
       try {
-        await voiceStream.streamVoiceResponse(`/api/conversations/${convId}/messages`, blob);
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const result = reader.result as string;
+            resolve(result.split(",")[1]);
+          };
+          reader.readAsDataURL(blob);
+        });
+        const res = await fetch("/api/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audio: base64 }),
+        });
+        const data = await res.json();
+        if (data.text) {
+          setInput(prev => prev ? prev + " " + data.text : data.text);
+        }
       } catch (err) {
-        console.error("Voice stream error:", err);
-        setMessages(prev => [...prev, { role: 'assistant', text: "Scusa, non sono riuscita a sentirti bene. Riprova!" }]);
+        console.error("Transcription error:", err);
+      } finally {
+        setIsTranscribing(false);
       }
     } else {
       await recorder.startRecording();
@@ -123,7 +126,7 @@ export function BimiChat() {
                 </div>
               </motion.div>
             ))}
-            {(chatMutation.isPending || voiceStream.playbackState === 'playing') && (
+            {(chatMutation.isPending || isTranscribing) && (
               <div className="flex justify-start">
                 <div className="bg-white dark:bg-zinc-800 border border-border rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1">
                   <span className="w-2 h-2 rounded-full bg-secondary animate-bounce" />
@@ -151,9 +154,10 @@ export function BimiChat() {
                 variant="ghost"
                 size="icon"
                 onClick={handleMicClick}
-                className={`rounded-full h-10 w-10 ${recorder.state === 'recording' ? 'bg-red-100 text-red-600 animate-pulse' : 'text-secondary hover:bg-secondary/10'}`}
+                disabled={isTranscribing}
+                className={`rounded-full h-10 w-10 ${recorder.state === 'recording' ? 'bg-red-100 text-red-600 animate-pulse' : isTranscribing ? 'text-orange-400' : 'text-secondary hover:bg-secondary/10'}`}
               >
-                {recorder.state === 'recording' ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
+                {isTranscribing ? <Loader2 className="w-5 h-5 animate-spin" /> : recorder.state === 'recording' ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
               </Button>
               <Button 
                 type="submit" 
