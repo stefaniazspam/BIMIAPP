@@ -72,6 +72,19 @@ export const reminders = pgTable("reminders", {
   completed: boolean("completed").default(false),
 });
 
+// --- Push Notification Subscriptions ---
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+});
+
+export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true });
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+
 // --- Pantry Categories ---
 export const pantryCategories = pgTable("pantry_categories", {
   id: serial("id").primaryKey(),

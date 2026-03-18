@@ -41,3 +41,10 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_openai_ai_integrations:2.0.0"]
+
+[userenv]
+
+[userenv.shared]
+VAPID_PUBLIC_KEY = "BMJfxm5igjPXPC4Ch1oHVvKK_a0nE6-NhRPSZv89RNNcO4v_gRhv8jCyWgFUrZAAKpsJ2K4xipm-glIsL2u2vgk"
+VAPID_PRIVATE_KEY = "r2BBFtzZ1fWyeLT_0uwmlC_dyxXywE5s-2ti9DGfnUc"
+VAPID_EMAIL = "mailto:bimi@app.local"

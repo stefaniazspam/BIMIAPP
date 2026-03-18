@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { users, dailyLogs, meals, pantryItems, shoppingListItems, reminders, insertPantryItemSchema, insertShoppingListItemSchema, insertReminderSchema } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, dailyLogs, meals, pantryItems, shoppingListItems, reminders, pushSubscriptions, insertPantryItemSchema, insertShoppingListItemSchema, insertReminderSchema } from "@shared/schema";
+import { eq, lte, and } from "drizzle-orm";
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
@@ -9,6 +9,15 @@ import { z } from "zod";
 import OpenAI from "openai";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerAudioRoutes } from "./replit_integrations/audio";
+import webpush from "web-push";
+
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL || "mailto:bimi@app.local",
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -503,6 +512,88 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
       res.status(500).json({ message: "Errore lista spesa" });
     }
   });
+
+  // Push notification: get public VAPID key
+  app.get("/api/push-vapid-key", (_req, res) => {
+    res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || "" });
+  });
+
+  // Push notification: save subscription
+  app.post("/api/push-subscribe", async (req, res) => {
+    try {
+      const { endpoint, keys } = req.body;
+      if (!endpoint || !keys?.p256dh || !keys?.auth) {
+        return res.status(400).json({ error: "Dati di sottoscrizione mancanti" });
+      }
+      await db.insert(pushSubscriptions).values({
+        userId: 1,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+      }).onConflictDoNothing();
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Push subscribe error:", err);
+      res.status(500).json({ error: "Errore sottoscrizione notifiche" });
+    }
+  });
+
+  // Push notification: remove subscription
+  app.delete("/api/push-subscribe", async (req, res) => {
+    try {
+      const { endpoint } = req.body;
+      if (endpoint) {
+        await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Errore rimozione sottoscrizione" });
+    }
+  });
+
+  // Scheduler: check reminders every minute and send push notifications
+  setInterval(async () => {
+    try {
+      const now = new Date();
+      const windowEnd = new Date(now.getTime() + 60000); // next 60s
+      
+      const dueReminders = await db.select().from(reminders)
+        .where(and(
+          eq(reminders.completed, false),
+          lte(reminders.remindAt, windowEnd)
+        ));
+
+      if (dueReminders.length === 0) return;
+
+      const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, 1));
+      if (subs.length === 0) return;
+
+      for (const reminder of dueReminders) {
+        const reminderTime = new Date(reminder.remindAt).getTime();
+        if (reminderTime > now.getTime() - 60000) {
+          for (const sub of subs) {
+            try {
+              await webpush.sendNotification(
+                { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+                JSON.stringify({
+                  title: "Bimì - Promemoria",
+                  body: reminder.title,
+                  tag: `reminder-${reminder.id}`,
+                  url: "/promemoria",
+                })
+              );
+            } catch (e: any) {
+              if (e.statusCode === 410 || e.statusCode === 404) {
+                await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Reminder scheduler error:", err);
+    }
+  }, 60000);
 
   // Setup seed data
   await seedDatabase();
