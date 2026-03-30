@@ -513,6 +513,11 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
     }
   });
 
+  // Health check endpoint (no DB dependency — used by Railway)
+  app.get("/health", (_req, res) => {
+    res.status(200).json({ status: "ok" });
+  });
+
   // Push notification: get public VAPID key
   app.get("/api/push-vapid-key", (_req, res) => {
     res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || "" });
