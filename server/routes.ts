@@ -246,6 +246,18 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
     }
   });
 
+  // Snooze: rinvia il promemoria di 5 minuti
+  app.post("/api/reminders/:id/snooze", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const snoozeTime = new Date(Date.now() + 5 * 60 * 1000);
+      const updated = await storage.updateReminder(id, { remindAt: snoozeTime, completed: false });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Errore snooze promemoria" });
+    }
+  });
+
   app.get(api.meals.list.path, async (req, res) => {
     const date = req.query.date as string | undefined;
     const meals = await storage.getMeals(date);
@@ -581,9 +593,12 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
               await webpush.sendNotification(
                 { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
                 JSON.stringify({
-                  title: "Bimì - Promemoria",
-                  body: reminder.title,
+                  title: `⏰ ${reminder.title}`,
+                  body: reminder.description
+                    ? reminder.description
+                    : "Tocca per aprire Bimì",
                   tag: `reminder-${reminder.id}`,
+                  reminderId: reminder.id,
                   url: "/promemoria",
                 })
               );
