@@ -172,7 +172,7 @@ export default function Meals() {
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-4 w-4 text-destructive p-0 shrink-0" 
+                            className="h-4 w-4 text-muted-foreground/50 p-0 shrink-0 hover:text-destructive" 
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteMeal.mutate(meal.id);
@@ -186,7 +186,7 @@ export default function Meals() {
                     
                     <Button 
                       variant="ghost" 
-                      className="w-6 h-6 border-dashed border border-muted/50 hover:border-primary/30 p-0 absolute right-1 bottom-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="w-6 h-6 border-dashed border border-muted/50 hover:border-primary/30 p-0 absolute right-1 bottom-1"
                       onClick={() => {
                         setSelectedSlot({ date: dateStr, type: type.id });
                         setIsGenOpen(true);
