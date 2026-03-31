@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   cycleDuration: integer("cycle_duration").default(28),
   periodDuration: integer("period_duration").default(5),
+  lastPeriodDate: date("last_period_date"),
 });
 
 // --- Daily Logs (Menstrual cycle, defecation, general notes) ---

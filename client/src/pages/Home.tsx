@@ -83,6 +83,26 @@ export default function Home() {
     });
   };
 
+  const calculatePhaseFromLastPeriod = (lastPeriodDateStr: string): string => {
+    const lastPeriod = new Date(lastPeriodDateStr);
+    const now = new Date();
+    const daysSince = Math.floor((now.getTime() - lastPeriod.getTime()) / (1000 * 60 * 60 * 24));
+    const cycleDur = user?.cycleDuration || 28;
+    const periodDur = user?.periodDuration || 5;
+    const dayInCycle = daysSince % cycleDur;
+    if (dayInCycle < periodDur) return "menstrual";
+    if (dayInCycle < cycleDur * 0.5 - 1) return "follicular";
+    if (dayInCycle < cycleDur * 0.5 + 1) return "ovulation";
+    return "luteal";
+  };
+
+  const handleLastPeriodSave = (dateStr: string) => {
+    if (!dateStr) return;
+    updateUser.mutate({ lastPeriodDate: dateStr });
+    const phase = calculatePhaseFromLastPeriod(dateStr);
+    upsertLog.mutate({ userId: 1, date: today, ...dailyLog, menstrualPhase: phase });
+  };
+
   const handleWaterUpdate = (amount: number) => {
     const currentWater = dailyLog?.waterIntake || 0;
     upsertLog.mutate({
@@ -346,12 +366,45 @@ export default function Home() {
             <DialogTitle className="font-display text-2xl">Impostazioni Ciclo</DialogTitle>
           </DialogHeader>
           <div className="space-y-6 py-4">
+
+            {/* Ultime mestruazioni */}
+            <div className="space-y-3">
+              <h4 className="font-bold text-sm text-muted-foreground uppercase">Ultime mestruazioni</h4>
+              <p className="text-xs text-muted-foreground">Inserisci il primo giorno dell'ultimo ciclo — la fase verrà calcolata automaticamente.</p>
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  defaultValue={user?.lastPeriodDate ?? ""}
+                  max={today}
+                  className="rounded-xl flex-1"
+                  id="last-period-input"
+                  data-testid="input-last-period-date"
+                />
+                <Button
+                  className="rounded-xl shrink-0"
+                  onClick={() => {
+                    const val = (document.getElementById("last-period-input") as HTMLInputElement)?.value;
+                    handleLastPeriodSave(val);
+                  }}
+                  data-testid="button-save-last-period"
+                >
+                  Salva
+                </Button>
+              </div>
+              {user?.lastPeriodDate && (
+                <p className="text-xs text-primary font-medium">
+                  Ultimo ciclo: {format(new Date(user.lastPeriodDate), "d MMMM yyyy", { locale: it })}
+                </p>
+              )}
+            </div>
+
+            {/* Durata media */}
             <div className="space-y-4">
               <h4 className="font-bold text-sm text-muted-foreground uppercase">Durata media</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-bold">Ciclo totale (gg)</label>
-                  <Input type="number" value={user?.cycleDuration || 33} onChange={(e) => updateUser.mutate({ cycleDuration: Number(e.target.value) })} />
+                  <Input type="number" value={user?.cycleDuration || 28} onChange={(e) => updateUser.mutate({ cycleDuration: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold">Mestruazioni (gg)</label>
@@ -359,8 +412,10 @@ export default function Home() {
                 </div>
               </div>
             </div>
+
+            {/* Stato manuale */}
             <div className="space-y-4">
-              <h4 className="font-bold text-sm text-muted-foreground uppercase">Stato mestruazioni</h4>
+              <h4 className="font-bold text-sm text-muted-foreground uppercase">Aggiorna manualmente</h4>
               <div className="flex flex-col gap-2">
                 <Button variant="outline" className="justify-start gap-2 rounded-xl" onClick={() => handleCycleUpdate("menstrualPhase", "menstrual")}>
                   <Droplets className="w-4 h-4 text-red-500" /> Sono iniziate oggi
