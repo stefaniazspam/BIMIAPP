@@ -1,12 +1,34 @@
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, addDays, addWeeks } from "date-fns";
 import { useReminders, useCreateReminder, useUpdateReminder, useDeleteReminder } from "@/hooks/use-bimi";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Bell, CalendarClock, BellOff, BellRing, Loader2 } from "lucide-react";
+
+const DATE_PRESETS = [
+  { value: "oggi",   label: "Oggi" },
+  { value: "domani", label: "Domani" },
+  { value: "2gg",    label: "Fra 2 giorni" },
+  { value: "1sett",  label: "Fra 1 settimana" },
+  { value: "2sett",  label: "Fra 2 settimane" },
+  { value: "custom", label: "Scegli data..." },
+];
+
+function resolvePresetDate(preset: string): string {
+  const today = new Date();
+  switch (preset) {
+    case "oggi":   return format(today, "yyyy-MM-dd");
+    case "domani": return format(addDays(today, 1), "yyyy-MM-dd");
+    case "2gg":    return format(addDays(today, 2), "yyyy-MM-dd");
+    case "1sett":  return format(addWeeks(today, 1), "yyyy-MM-dd");
+    case "2sett":  return format(addWeeks(today, 2), "yyyy-MM-dd");
+    default:       return "";
+  }
+}
 
 export default function Reminders() {
   const { data: reminders } = useReminders();
@@ -17,6 +39,16 @@ export default function Reminders() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [newReminder, setNewReminder] = useState({ title: "", date: "", time: "" });
+  const [datePreset, setDatePreset] = useState<string>("");
+
+  const handlePresetChange = (value: string) => {
+    setDatePreset(value);
+    if (value !== "custom") {
+      setNewReminder(r => ({ ...r, date: resolvePresetDate(value) }));
+    } else {
+      setNewReminder(r => ({ ...r, date: "" }));
+    }
+  };
 
   const handleAdd = async () => {
     if (!newReminder.title || !newReminder.date || !newReminder.time) return;
@@ -28,6 +60,7 @@ export default function Reminders() {
       completed: false
     });
     setNewReminder({ title: "", date: "", time: "" });
+    setDatePreset("");
     setIsOpen(false);
   };
 
@@ -55,7 +88,7 @@ export default function Reminders() {
               }
             </Button>
           )}
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <Dialog open={isOpen} onOpenChange={(o) => { setIsOpen(o); if (!o) { setNewReminder({ title: "", date: "", time: "" }); setDatePreset(""); } }}>
             <DialogTrigger asChild>
               <Button size="icon" className="rounded-full shadow-md bg-secondary text-secondary-foreground hover:bg-secondary/90">
                 <Plus className="w-6 h-6" />
@@ -71,13 +104,47 @@ export default function Reminders() {
                   value={newReminder.title}
                   onChange={e => setNewReminder({ ...newReminder, title: e.target.value })}
                   className="rounded-xl"
+                  data-testid="input-reminder-title"
                 />
-                <div className="grid grid-cols-2 gap-4">
-                  <Input type="date" value={newReminder.date} onChange={e => setNewReminder({ ...newReminder, date: e.target.value })} className="rounded-xl" />
-                  <Input type="time" value={newReminder.time} onChange={e => setNewReminder({ ...newReminder, time: e.target.value })} className="rounded-xl" />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-2">
+                    <Select value={datePreset} onValueChange={handlePresetChange}>
+                      <SelectTrigger className="rounded-xl" data-testid="select-reminder-date-preset">
+                        <SelectValue placeholder="Quando?" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DATE_PRESETS.map(p => (
+                          <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {datePreset === "custom" && (
+                      <Input
+                        type="date"
+                        value={newReminder.date}
+                        onChange={e => setNewReminder({ ...newReminder, date: e.target.value })}
+                        className="rounded-xl"
+                        data-testid="input-reminder-date-custom"
+                      />
+                    )}
+                  </div>
+                  <Input
+                    type="time"
+                    value={newReminder.time}
+                    onChange={e => setNewReminder({ ...newReminder, time: e.target.value })}
+                    className="rounded-xl"
+                    data-testid="input-reminder-time"
+                  />
                 </div>
-                <Button onClick={handleAdd} className="rounded-xl font-bold w-full" disabled={createReminder.isPending}>
-                  Crea Promemoria
+
+                <Button
+                  onClick={handleAdd}
+                  className="rounded-xl font-bold w-full"
+                  disabled={createReminder.isPending || !newReminder.title || !newReminder.date || !newReminder.time}
+                  data-testid="button-create-reminder"
+                >
+                  {createReminder.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Crea Promemoria"}
                 </Button>
               </div>
             </DialogContent>
@@ -122,6 +189,7 @@ export default function Reminders() {
                   checked={reminder.completed || false}
                   onCheckedChange={(c) => updateReminder.mutate({ id: reminder.id, completed: !!c })}
                   className="w-6 h-6 rounded-full border-2 border-primary data-[state=checked]:bg-primary"
+                  data-testid={`checkbox-reminder-${reminder.id}`}
                 />
                 <div>
                   <p className={`font-bold text-base ${reminder.completed ? "line-through text-muted-foreground" : ""}`}>
@@ -138,6 +206,7 @@ export default function Reminders() {
                 size="icon"
                 onClick={() => deleteReminder.mutate(reminder.id)}
                 className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                data-testid={`button-delete-reminder-${reminder.id}`}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
