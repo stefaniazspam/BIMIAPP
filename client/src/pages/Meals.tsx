@@ -165,14 +165,11 @@ export default function Meals() {
 
                     <div className="space-y-1 mt-1 flex-1">
                       {dayMeals?.map((meal: any) => (
-                        <div key={meal.id} className="relative group/meal">
-                          <p className="text-[10px] font-bold line-clamp-1 cursor-pointer leading-tight pr-4 hover:text-primary" onClick={() => setViewRecipe(meal)}>
-                            {meal.name}
-                          </p>
+                        <div key={meal.id} className="relative group/meal flex items-center gap-1">
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-4 w-4 text-destructive p-0 absolute top-0 right-0 opacity-0 group-hover/meal:opacity-100 transition-opacity" 
+                            className="h-4 w-4 text-destructive p-0 shrink-0 opacity-0 group-hover/meal:opacity-100 transition-opacity" 
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteMeal.mutate(meal.id);
@@ -180,13 +177,16 @@ export default function Meals() {
                           >
                             <Trash2 className="w-2.5 h-2.5" />
                           </Button>
+                          <p className="text-[10px] font-bold line-clamp-1 cursor-pointer leading-tight flex-1 hover:text-primary" onClick={() => setViewRecipe(meal)}>
+                            {meal.name}
+                          </p>
                         </div>
                       ))}
                     </div>
                     
                     <Button 
                       variant="ghost" 
-                      className="w-6 h-6 border-dashed border border-muted/50 hover:border-primary/30 p-0 absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="w-6 h-6 border-dashed border border-muted/50 hover:border-primary/30 p-0 absolute right-1 bottom-1 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={() => {
                         setSelectedSlot({ date: dateStr, type: type.id });
                         setIsGenOpen(true);
