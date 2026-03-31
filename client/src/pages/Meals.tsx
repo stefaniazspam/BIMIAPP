@@ -163,13 +163,16 @@ export default function Meals() {
                       <span className="text-[8px] font-bold uppercase text-muted-foreground/70">{type.label}</span>
                     </div>
 
-                    <div className="space-y-1 mt-1 flex-1">
+                    <div className="space-y-1 mt-1 flex-1 pr-7">
                       {dayMeals?.map((meal: any) => (
-                        <div key={meal.id} className="relative group/meal flex items-center gap-1">
+                        <div key={meal.id} className="flex items-center gap-1">
+                          <p className="text-[10px] font-bold line-clamp-1 cursor-pointer leading-tight flex-1 hover:text-primary" onClick={() => setViewRecipe(meal)}>
+                            {meal.name}
+                          </p>
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-4 w-4 text-destructive p-0 shrink-0 opacity-0 group-hover/meal:opacity-100 transition-opacity" 
+                            className="h-4 w-4 text-destructive p-0 shrink-0" 
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteMeal.mutate(meal.id);
@@ -177,9 +180,6 @@ export default function Meals() {
                           >
                             <Trash2 className="w-2.5 h-2.5" />
                           </Button>
-                          <p className="text-[10px] font-bold line-clamp-1 cursor-pointer leading-tight flex-1 hover:text-primary" onClick={() => setViewRecipe(meal)}>
-                            {meal.name}
-                          </p>
                         </div>
                       ))}
                     </div>
