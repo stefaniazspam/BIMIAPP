@@ -68,6 +68,7 @@ export const reminders = pgTable("reminders", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   title: text("title").notNull(),
+  description: text("description"),
   remindAt: timestamp("remind_at").notNull(),
   completed: boolean("completed").default(false),
 });

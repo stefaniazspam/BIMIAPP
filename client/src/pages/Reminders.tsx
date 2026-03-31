@@ -38,7 +38,7 @@ export default function Reminders() {
   const { isSupported, permission, isSubscribed, isLoading, subscribe, unsubscribe } = usePushNotifications();
 
   const [isOpen, setIsOpen] = useState(false);
-  const [newReminder, setNewReminder] = useState({ title: "", date: "", time: "" });
+  const [newReminder, setNewReminder] = useState({ title: "", description: "", date: "", time: "" });
   const [datePreset, setDatePreset] = useState<string>("");
 
   const handlePresetChange = (value: string) => {
@@ -56,10 +56,11 @@ export default function Reminders() {
     await createReminder.mutateAsync({
       userId: 1,
       title: newReminder.title,
+      description: newReminder.description || undefined,
       remindAt: dateTime,
       completed: false
     });
-    setNewReminder({ title: "", date: "", time: "" });
+    setNewReminder({ title: "", description: "", date: "", time: "" });
     setDatePreset("");
     setIsOpen(false);
   };
@@ -105,6 +106,13 @@ export default function Reminders() {
                   onChange={e => setNewReminder({ ...newReminder, title: e.target.value })}
                   className="rounded-xl"
                   data-testid="input-reminder-title"
+                />
+                <Input
+                  placeholder="Descrizione (opzionale) — apparirà nella notifica"
+                  value={newReminder.description}
+                  onChange={e => setNewReminder({ ...newReminder, description: e.target.value })}
+                  className="rounded-xl"
+                  data-testid="input-reminder-description"
                 />
 
                 <div className="grid grid-cols-2 gap-3">
@@ -195,7 +203,12 @@ export default function Reminders() {
                   <p className={`font-bold text-base ${reminder.completed ? "line-through text-muted-foreground" : ""}`}>
                     {reminder.title}
                   </p>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  {reminder.description && (
+                    <p className={`text-xs mt-0.5 ${reminder.completed ? "line-through text-muted-foreground/60" : "text-muted-foreground"}`}>
+                      {reminder.description}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                     <Bell className="w-3 h-3" />
                     {format(new Date(reminder.remindAt), "d MMM yyyy, HH:mm")}
                   </div>
