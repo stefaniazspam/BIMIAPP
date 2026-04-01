@@ -258,6 +258,21 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
     }
   });
 
+  // Tomorrow: sposta il promemoria a domani alla stessa ora
+  app.post("/api/reminders/:id/tomorrow", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const reminder = await storage.getReminder(id);
+      if (!reminder) return res.status(404).json({ message: "Promemoria non trovato" });
+      const current = new Date(reminder.remindAt);
+      const tomorrow = new Date(current.getTime() + 24 * 60 * 60 * 1000);
+      const updated = await storage.updateReminder(id, { remindAt: tomorrow, completed: false });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Errore spostamento a domani" });
+    }
+  });
+
   app.get(api.meals.list.path, async (req, res) => {
     const date = req.query.date as string | undefined;
     const meals = await storage.getMeals(date);

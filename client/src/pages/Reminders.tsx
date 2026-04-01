@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Bell, CalendarClock, BellOff, BellRing, Loader2 } from "lucide-react";
+import { Plus, Trash2, Bell, CalendarClock, BellOff, BellRing, Loader2, Pencil } from "lucide-react";
+import type { Reminder } from "@shared/schema";
 
 const DATE_PRESETS = [
   { value: "oggi",   label: "Oggi" },
@@ -30,6 +31,8 @@ function resolvePresetDate(preset: string): string {
   }
 }
 
+const emptyForm = { title: "", description: "", date: "", time: "" };
+
 export default function Reminders() {
   const { data: reminders } = useReminders();
   const createReminder = useCreateReminder();
@@ -37,35 +40,67 @@ export default function Reminders() {
   const deleteReminder = useDeleteReminder();
   const { isSupported, permission, isSubscribed, isLoading, subscribe, unsubscribe } = usePushNotifications();
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [newReminder, setNewReminder] = useState({ title: "", description: "", date: "", time: "" });
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newReminder, setNewReminder] = useState(emptyForm);
   const [datePreset, setDatePreset] = useState<string>("");
 
-  const handlePresetChange = (value: string) => {
+  const [editReminder, setEditReminder] = useState<Reminder | null>(null);
+  const [editForm, setEditForm] = useState(emptyForm);
+  const [editPreset, setEditPreset] = useState<string>("custom");
+
+  const handlePresetChange = (value: string, setter: typeof setNewReminder) => {
     setDatePreset(value);
-    if (value !== "custom") {
-      setNewReminder(r => ({ ...r, date: resolvePresetDate(value) }));
-    } else {
-      setNewReminder(r => ({ ...r, date: "" }));
-    }
+    if (value !== "custom") setter(r => ({ ...r, date: resolvePresetDate(value) }));
+    else setter(r => ({ ...r, date: "" }));
+  };
+
+  const handleEditPresetChange = (value: string) => {
+    setEditPreset(value);
+    if (value !== "custom") setEditForm(r => ({ ...r, date: resolvePresetDate(value) }));
+    else setEditForm(r => ({ ...r, date: "" }));
   };
 
   const handleAdd = async () => {
     if (!newReminder.title || !newReminder.date || !newReminder.time) return;
-    const dateTime = new Date(`${newReminder.date}T${newReminder.time}`);
     await createReminder.mutateAsync({
       userId: 1,
       title: newReminder.title,
       description: newReminder.description || undefined,
-      remindAt: dateTime,
-      completed: false
+      remindAt: new Date(`${newReminder.date}T${newReminder.time}`),
+      completed: false,
     });
-    setNewReminder({ title: "", description: "", date: "", time: "" });
+    setNewReminder(emptyForm);
     setDatePreset("");
-    setIsOpen(false);
+    setIsCreateOpen(false);
   };
 
-  const sortedReminders = reminders?.sort((a, b) => new Date(a.remindAt).getTime() - new Date(b.remindAt).getTime()) || [];
+  const openEdit = (r: Reminder) => {
+    const dt = new Date(r.remindAt);
+    setEditReminder(r);
+    setEditForm({
+      title: r.title,
+      description: r.description || "",
+      date: format(dt, "yyyy-MM-dd"),
+      time: format(dt, "HH:mm"),
+    });
+    setEditPreset("custom");
+  };
+
+  const handleEditSave = async () => {
+    if (!editReminder || !editForm.title || !editForm.date || !editForm.time) return;
+    await updateReminder.mutateAsync({
+      id: editReminder.id,
+      title: editForm.title,
+      description: editForm.description || undefined,
+      remindAt: new Date(`${editForm.date}T${editForm.time}`),
+      completed: editReminder.completed ?? false,
+    });
+    setEditReminder(null);
+  };
+
+  const sortedReminders = [...(reminders || [])].sort(
+    (a, b) => new Date(a.remindAt).getTime() - new Date(b.remindAt).getTime()
+  );
 
   return (
     <div className="space-y-6 pb-20">
@@ -83,82 +118,44 @@ export default function Reminders() {
             >
               {isLoading
                 ? <Loader2 className="w-5 h-5 animate-spin" />
-                : isSubscribed
-                  ? <BellRing className="w-5 h-5" />
-                  : <BellOff className="w-5 h-5" />
-              }
+                : isSubscribed ? <BellRing className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
             </Button>
           )}
-          <Dialog open={isOpen} onOpenChange={(o) => { setIsOpen(o); if (!o) { setNewReminder({ title: "", date: "", time: "" }); setDatePreset(""); } }}>
+
+          {/* Crea nuovo */}
+          <Dialog open={isCreateOpen} onOpenChange={(o) => { setIsCreateOpen(o); if (!o) { setNewReminder(emptyForm); setDatePreset(""); } }}>
             <DialogTrigger asChild>
               <Button size="icon" className="rounded-full shadow-md bg-secondary text-secondary-foreground hover:bg-secondary/90">
                 <Plus className="w-6 h-6" />
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md rounded-2xl">
-              <DialogHeader>
-                <DialogTitle>Nuovo Promemoria</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <Input
-                  placeholder="Cosa devi ricordare?"
-                  value={newReminder.title}
-                  onChange={e => setNewReminder({ ...newReminder, title: e.target.value })}
-                  className="rounded-xl"
-                  data-testid="input-reminder-title"
-                />
-                <Input
-                  placeholder="Descrizione (opzionale) — apparirà nella notifica"
-                  value={newReminder.description}
-                  onChange={e => setNewReminder({ ...newReminder, description: e.target.value })}
-                  className="rounded-xl"
-                  data-testid="input-reminder-description"
-                />
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-2">
-                    <Select value={datePreset} onValueChange={handlePresetChange}>
-                      <SelectTrigger className="rounded-xl" data-testid="select-reminder-date-preset">
-                        <SelectValue placeholder="Quando?" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DATE_PRESETS.map(p => (
-                          <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {datePreset === "custom" && (
-                      <Input
-                        type="date"
-                        value={newReminder.date}
-                        onChange={e => setNewReminder({ ...newReminder, date: e.target.value })}
-                        className="rounded-xl"
-                        data-testid="input-reminder-date-custom"
-                      />
-                    )}
-                  </div>
-                  <Input
-                    type="time"
-                    value={newReminder.time}
-                    onChange={e => setNewReminder({ ...newReminder, time: e.target.value })}
-                    className="rounded-xl"
-                    data-testid="input-reminder-time"
-                  />
-                </div>
-
-                <Button
-                  onClick={handleAdd}
-                  className="rounded-xl font-bold w-full"
-                  disabled={createReminder.isPending || !newReminder.title || !newReminder.date || !newReminder.time}
-                  data-testid="button-create-reminder"
-                >
-                  {createReminder.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Crea Promemoria"}
-                </Button>
-              </div>
-            </DialogContent>
+            <ReminderFormDialog
+              title="Nuovo Promemoria"
+              form={newReminder}
+              datePreset={datePreset}
+              onFormChange={setNewReminder}
+              onPresetChange={(v) => handlePresetChange(v, setNewReminder)}
+              onSave={handleAdd}
+              isPending={createReminder.isPending}
+              saveLabel="Crea Promemoria"
+            />
           </Dialog>
         </div>
       </div>
+
+      {/* Modifica dialog */}
+      <Dialog open={!!editReminder} onOpenChange={(o) => { if (!o) setEditReminder(null); }}>
+        <ReminderFormDialog
+          title="Modifica Promemoria"
+          form={editForm}
+          datePreset={editPreset}
+          onFormChange={setEditForm}
+          onPresetChange={handleEditPresetChange}
+          onSave={handleEditSave}
+          isPending={updateReminder.isPending}
+          saveLabel="Salva modifiche"
+        />
+      </Dialog>
 
       {isSupported && !isSubscribed && permission !== "denied" && (
         <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-center gap-3">
@@ -191,42 +188,123 @@ export default function Reminders() {
           </div>
         ) : (
           sortedReminders.map(reminder => (
-            <div key={reminder.id} className="bg-card p-4 rounded-xl shadow-sm border border-border flex items-center justify-between group hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-4">
-                <Checkbox
-                  checked={reminder.completed || false}
-                  onCheckedChange={(c) => updateReminder.mutate({ id: reminder.id, completed: !!c })}
-                  className="w-6 h-6 rounded-full border-2 border-primary data-[state=checked]:bg-primary"
-                  data-testid={`checkbox-reminder-${reminder.id}`}
-                />
-                <div>
-                  <p className={`font-bold text-base ${reminder.completed ? "line-through text-muted-foreground" : ""}`}>
-                    {reminder.title}
+            <div key={reminder.id} className="bg-card p-4 rounded-xl shadow-sm border border-border flex items-center gap-3 hover:shadow-md transition-shadow">
+              <Checkbox
+                checked={reminder.completed || false}
+                onCheckedChange={(c) => updateReminder.mutate({ id: reminder.id, completed: !!c })}
+                className="w-6 h-6 rounded-full border-2 border-primary data-[state=checked]:bg-primary shrink-0"
+                data-testid={`checkbox-reminder-${reminder.id}`}
+              />
+              <div className="flex-1 min-w-0">
+                <p className={`font-bold text-base truncate ${reminder.completed ? "line-through text-muted-foreground" : ""}`}>
+                  {reminder.title}
+                </p>
+                {reminder.description && (
+                  <p className={`text-xs mt-0.5 truncate ${reminder.completed ? "line-through text-muted-foreground/60" : "text-muted-foreground"}`}>
+                    {reminder.description}
                   </p>
-                  {reminder.description && (
-                    <p className={`text-xs mt-0.5 ${reminder.completed ? "line-through text-muted-foreground/60" : "text-muted-foreground"}`}>
-                      {reminder.description}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                    <Bell className="w-3 h-3" />
-                    {format(new Date(reminder.remindAt), "d MMM yyyy, HH:mm")}
-                  </div>
+                )}
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                  <Bell className="w-3 h-3 shrink-0" />
+                  {format(new Date(reminder.remindAt), "d MMM yyyy, HH:mm")}
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => deleteReminder.mutate(reminder.id)}
-                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
-                data-testid={`button-delete-reminder-${reminder.id}`}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openEdit(reminder)}
+                  className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
+                  data-testid={`button-edit-reminder-${reminder.id}`}
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => deleteReminder.mutate(reminder.id)}
+                  className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                  data-testid={`button-delete-reminder-${reminder.id}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           ))
         )}
       </div>
     </div>
+  );
+}
+
+type FormState = { title: string; description: string; date: string; time: string };
+
+function ReminderFormDialog({
+  title, form, datePreset, onFormChange, onPresetChange, onSave, isPending, saveLabel,
+}: {
+  title: string;
+  form: FormState;
+  datePreset: string;
+  onFormChange: (f: FormState) => void;
+  onPresetChange: (v: string) => void;
+  onSave: () => void;
+  isPending: boolean;
+  saveLabel: string;
+}) {
+  return (
+    <DialogContent className="sm:max-w-md rounded-2xl">
+      <DialogHeader>
+        <DialogTitle>{title}</DialogTitle>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
+        <Input
+          placeholder="Cosa devi ricordare?"
+          value={form.title}
+          onChange={e => onFormChange({ ...form, title: e.target.value })}
+          className="rounded-xl"
+        />
+        <Input
+          placeholder="Descrizione (opzionale) — apparirà nella notifica"
+          value={form.description}
+          onChange={e => onFormChange({ ...form, description: e.target.value })}
+          className="rounded-xl"
+        />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-2">
+            <Select value={datePreset} onValueChange={onPresetChange}>
+              <SelectTrigger className="rounded-xl">
+                <SelectValue placeholder="Quando?" />
+              </SelectTrigger>
+              <SelectContent>
+                {DATE_PRESETS.map(p => (
+                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(datePreset === "custom" || !datePreset) && (
+              <Input
+                type="date"
+                value={form.date}
+                onChange={e => onFormChange({ ...form, date: e.target.value })}
+                className="rounded-xl"
+              />
+            )}
+          </div>
+          <Input
+            type="time"
+            value={form.time}
+            onChange={e => onFormChange({ ...form, time: e.target.value })}
+            className="rounded-xl"
+          />
+        </div>
+        <Button
+          onClick={onSave}
+          className="rounded-xl font-bold w-full"
+          disabled={isPending || !form.title || !form.date || !form.time}
+        >
+          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : saveLabel}
+        </Button>
+      </div>
+    </DialogContent>
   );
 }

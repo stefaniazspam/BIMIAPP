@@ -28,8 +28,9 @@ self.addEventListener("push", (event) => {
       reminderId: data.reminderId,
     },
     actions: [
-      { action: "snooze", title: "⏰ Ricordamelo fra 5 min" },
-      { action: "done", title: "✅ OK, fatto!" },
+      { action: "done",     title: "✅ Fatto!" },
+      { action: "snooze",   title: "⏰ Fra 5 min" },
+      { action: "tomorrow", title: "📅 Domani" },
     ],
   };
 
@@ -38,9 +39,22 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const reminderId = event.notification.data?.reminderId;
+
+  if (event.action === "done") {
+    if (reminderId) {
+      event.waitUntil(
+        fetch("/api/reminders/" + reminderId, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ completed: true }),
+        }).catch(() => {})
+      );
+    }
+    return;
+  }
 
   if (event.action === "snooze") {
-    const reminderId = event.notification.data?.reminderId;
     if (reminderId) {
       event.waitUntil(
         fetch("/api/reminders/" + reminderId + "/snooze", {
@@ -52,14 +66,12 @@ self.addEventListener("notificationclick", (event) => {
     return;
   }
 
-  if (event.action === "done") {
-    const reminderId = event.notification.data?.reminderId;
+  if (event.action === "tomorrow") {
     if (reminderId) {
       event.waitUntil(
-        fetch("/api/reminders/" + reminderId, {
-          method: "PATCH",
+        fetch("/api/reminders/" + reminderId + "/tomorrow", {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ completed: true }),
         }).catch(() => {})
       );
     }
