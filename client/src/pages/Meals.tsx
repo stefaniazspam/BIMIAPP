@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { it } from "date-fns/locale";
-import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, useDeleteMeal, useGenerateMeal, useAddToShoppingList, useCreateMeal, useCreatePantryItem } from "@/hooks/use-bimi";
+import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, useDeleteMeal, useGenerateMeal, useAddToShoppingList, useCreateMeal, useCreatePantryItem, useCreateShoppingItem } from "@/hooks/use-bimi";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ export default function Meals() {
   const generateMeal = useGenerateMeal();
   const createMeal = useCreateMeal();
   const addToShoppingList = useAddToShoppingList();
+  const createShoppingItem = useCreateShoppingItem();
   const createPantryItem = useCreatePantryItem();
 
   const [isGenOpen, setIsGenOpen] = useState(false);
@@ -75,9 +76,10 @@ export default function Meals() {
   const handleAddSelectedToShopping = async () => {
     const items = ingPicker.filter(i => i.checked && i.name.trim());
     for (const item of items) {
-      await addToShoppingList.mutateAsync({
+      await createShoppingItem.mutateAsync({
         userId: 1,
         name: item.name.trim(),
+        quantity: "1",
         subCategory: item.category,
         checked: false,
       });
