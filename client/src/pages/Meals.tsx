@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Trash2, Utensils, Coffee, Apple, Moon, ChefHat, ShoppingCart, Loader2, Search, Sparkles } from "lucide-react";
+import { Plus, Trash2, Utensils, Coffee, Apple, Moon, ChefHat, ShoppingCart, Loader2, Search, Sparkles, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,9 +26,8 @@ export default function Meals() {
   const createPantryItem = useCreatePantryItem();
 
   const [isGenOpen, setIsGenOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [isManualOpen, setIsManualOpen] = useState(false);
+  const [manualMeal, setManualMeal] = useState({ name: "", description: "" });
   const [selectedSlot, setSelectedSlot] = useState<{ date: string, type: string } | null>(null);
   const [genPrompt, setGenPrompt] = useState("");
   const [servings, setServings] = useState(2);
@@ -85,34 +84,20 @@ export default function Meals() {
     }
   };
 
-  const handleSmartSearch = async () => {
-    setIsSearching(true);
-    try {
-      const res = await fetch("/api/recipes/search", { method: "POST" });
-      const data = await res.json();
-      setSearchResults(data.recipes || []);
-      setIsSearchOpen(true);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleAddFromSearch = async (recipe: any) => {
-    if (!selectedSlot) return;
+  const handleManualSave = async () => {
+    if (!selectedSlot || !manualMeal.name.trim()) return;
     await createMeal.mutateAsync({
       userId: 1,
       date: selectedSlot.date,
       mealType: selectedSlot.type,
-      name: recipe.name,
-      recipe: recipe.recipe,
-      ingredients: recipe.ingredients,
-      servings: 2,
-      isPlanned: true
+      name: manualMeal.name,
+      recipe: manualMeal.description || "",
+      ingredients: [],
+      servings: 1,
+      isPlanned: true,
     });
-    setIsSearchOpen(false);
-    setIsGenOpen(false);
+    setManualMeal({ name: "", description: "" });
+    setIsManualOpen(false);
   };
 
   return (
@@ -255,36 +240,58 @@ export default function Meals() {
                 {generateMeal.isPending ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Sparkles className="w-5 h-5 mr-2" />}
                 Genera con AI
               </Button>
-              <Button variant="outline" onClick={handleSmartSearch} className="w-full rounded-xl h-12 border-primary/30 text-primary" disabled={isSearching}>
-                {isSearching ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Search className="w-5 h-5 mr-2" />}
-                Cerca in Dispensa
+              <Button
+                variant="outline"
+                onClick={() => { setIsGenOpen(false); setIsManualOpen(true); }}
+                className="w-full rounded-xl h-12 border-primary/30 text-primary"
+                data-testid="button-manual-meal"
+              >
+                <Pencil className="w-5 h-5 mr-2" />
+                Inserisci pasto
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Smart Search Results */}
-      <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[80vh] overflow-y-auto rounded-3xl">
+      {/* Manual Meal Entry */}
+      <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl flex items-center gap-2">
-              <Sparkles className="text-primary" />
-              Idee dalla tua dispensa
+              <Pencil className="text-primary" />
+              Inserisci pasto
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {searchResults.map((res, i) => (
-              <Card key={i} className="p-4 border-primary/10 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => handleAddFromSearch(res)}>
-                <h4 className="font-bold text-lg text-primary">{res.name}</h4>
-                <p className="text-sm text-muted-foreground mt-1">{res.description}</p>
-                <div className="flex flex-wrap gap-1 mt-3">
-                  {res.ingredients?.slice(0, 4).map((ing: string) => (
-                    <span key={ing} className="text-[10px] bg-primary/5 text-primary px-2 py-0.5 rounded-full">{ing}</span>
-                  ))}
-                </div>
-              </Card>
-            ))}
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-muted-foreground">Nome del pasto</label>
+              <Input
+                placeholder="es: Pasta al pomodoro"
+                value={manualMeal.name}
+                onChange={(e) => setManualMeal({ ...manualMeal, name: e.target.value })}
+                className="rounded-xl h-12"
+                data-testid="input-manual-meal-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-muted-foreground">Descrizione (opzionale)</label>
+              <textarea
+                placeholder="Note, ingredienti o preparazione..."
+                value={manualMeal.description}
+                onChange={(e) => setManualMeal({ ...manualMeal, description: e.target.value })}
+                className="w-full rounded-xl min-h-[100px] p-3 border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                data-testid="textarea-manual-meal-description"
+              />
+            </div>
+            <Button
+              onClick={handleManualSave}
+              disabled={!manualMeal.name.trim() || createMeal.isPending}
+              className="w-full rounded-xl h-12 font-bold"
+              data-testid="button-save-manual-meal"
+            >
+              {createMeal.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salva pasto"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

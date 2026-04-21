@@ -87,6 +87,24 @@ export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 
+// --- Daily Checks (custom user-defined daily checks like cycle, vitamins, etc.) ---
+export const dailyChecks = pgTable("daily_checks", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#10b981"), // hex color for the calendar dot
+  trackDays: boolean("track_days").default(false), // if true, show counter of days since last check (e.g., for period)
+  order: integer("order").notNull().default(0),
+});
+
+// --- Daily Check Logs (one row = one check on a specific date) ---
+export const dailyCheckLogs = pgTable("daily_check_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  checkId: integer("check_id").notNull(),
+  date: text("date").notNull(), // YYYY-MM-DD
+});
+
 // --- Pantry Categories ---
 export const pantryCategories = pgTable("pantry_categories", {
   id: serial("id").primaryKey(),
@@ -132,6 +150,15 @@ export type UpdateReminderRequest = Partial<InsertReminder>;
 export const insertPantryCategorySchema = createInsertSchema(pantryCategories).omit({ id: true });
 export type PantryCategory = typeof pantryCategories.$inferSelect;
 export type InsertPantryCategory = z.infer<typeof insertPantryCategorySchema>;
+
+export const insertDailyCheckSchema = createInsertSchema(dailyChecks).omit({ id: true });
+export type DailyCheck = typeof dailyChecks.$inferSelect;
+export type InsertDailyCheck = z.infer<typeof insertDailyCheckSchema>;
+export type UpdateDailyCheckRequest = Partial<InsertDailyCheck>;
+
+export const insertDailyCheckLogSchema = createInsertSchema(dailyCheckLogs).omit({ id: true });
+export type DailyCheckLog = typeof dailyCheckLogs.$inferSelect;
+export type InsertDailyCheckLog = z.infer<typeof insertDailyCheckLogSchema>;
 
 export * from "./models/chat";
 

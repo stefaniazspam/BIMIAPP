@@ -445,6 +445,38 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
     res.status(204).end();
   });
 
+  // ===== Daily Checks =====
+  app.get("/api/daily-checks", async (req, res) => {
+    const checks = await storage.getDailyChecks(1);
+    res.json(checks);
+  });
+
+  app.post("/api/daily-checks", async (req, res) => {
+    const created = await storage.createDailyCheck({ ...req.body, userId: 1 });
+    res.json(created);
+  });
+
+  app.patch("/api/daily-checks/:id", async (req, res) => {
+    const updated = await storage.updateDailyCheck(Number(req.params.id), req.body);
+    res.json(updated);
+  });
+
+  app.delete("/api/daily-checks/:id", async (req, res) => {
+    await storage.deleteDailyCheck(Number(req.params.id));
+    res.status(204).end();
+  });
+
+  app.get("/api/daily-check-logs", async (req, res) => {
+    const logs = await storage.getDailyCheckLogs(1);
+    res.json(logs);
+  });
+
+  app.post("/api/daily-check-logs/toggle", async (req, res) => {
+    const { checkId, date, checked } = req.body;
+    await storage.setDailyCheckLog(1, Number(checkId), String(date), Boolean(checked));
+    res.json({ ok: true });
+  });
+
   app.post("/api/meals/generate", async (req, res) => {
     try {
       const { prompt, date, mealType, servings, usePantry } = req.body;

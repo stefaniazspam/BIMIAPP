@@ -1,6 +1,10 @@
-import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addHours } from "date-fns";
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addHours, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
-import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, usePantryItems, useReminders, useUser, useUpdateUser } from "@/hooks/use-bimi";
+import {
+  useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, usePantryItems, useReminders, useUser, useUpdateUser,
+  useDailyChecks, useCreateDailyCheck, useUpdateDailyCheck, useDeleteDailyCheck,
+  useDailyCheckLogs, useToggleDailyCheckLog,
+} from "@/hooks/use-bimi";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { differenceInDays, isToday, isTomorrow } from "date-fns";
@@ -8,7 +12,7 @@ import { GlassWater } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
-import { AlertCircle, Droplets, Calendar as CalendarIcon, CheckCircle2, ArrowRight, ChefHat, Utensils, Settings, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { AlertCircle, Droplets, Calendar as CalendarIcon, CheckCircle2, ArrowRight, ChefHat, Utensils, Settings, ChevronLeft, ChevronRight, X, Plus, Trash2, Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -37,8 +41,31 @@ export default function Home() {
   const { data: meals, isLoading: mealsLoading } = useMeals(); // Fetch all for calendar
   const { data: pantry } = usePantryItems();
   const { data: reminders } = useReminders();
+  const { data: dailyChecks } = useDailyChecks();
+  const { data: dailyCheckLogs } = useDailyCheckLogs();
+  const createDailyCheck = useCreateDailyCheck();
+  const updateDailyCheck = useUpdateDailyCheck();
+  const deleteDailyCheck = useDeleteDailyCheck();
+  const toggleCheckLog = useToggleDailyCheckLog();
   const upsertLog = useUpsertDailyLog();
   const updateUser = useUpdateUser();
+
+  const isCheckedToday = (checkId: number) =>
+    (dailyCheckLogs || []).some((l: any) => l.checkId === checkId && l.date === today);
+
+  const daysSinceLastCheck = (checkId: number): number | null => {
+    const logs = (dailyCheckLogs || []).filter((l: any) => l.checkId === checkId).map((l: any) => l.date).sort().reverse();
+    if (logs.length === 0) return null;
+    const last = logs[0];
+    if (last === today) return 0;
+    return differenceInDays(new Date(today), new Date(last));
+  };
+
+  const [newCheckName, setNewCheckName] = useState("");
+  const [newCheckColor, setNewCheckColor] = useState("#10b981");
+  const [newCheckTrack, setNewCheckTrack] = useState(false);
+
+  const PRESET_COLORS = ["#ef4444", "#f97316", "#eab308", "#10b981", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899"];
   
   const queryClient = useQueryClient();
   const updateReminder = useMutation({
@@ -168,28 +195,62 @@ export default function Home() {
           </Button>
         </div>
         
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white/50 dark:bg-black/20 p-4 rounded-xl backdrop-blur-sm cursor-pointer" onClick={() => setIsSettingsOpen(true)}>
-            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Fase Ciclo</span>
-            <p className="text-xl font-bold text-foreground mt-1 capitalize">
-              {logLoading ? <Skeleton className="h-6 w-20" /> : (dailyLog?.menstrualPhase || "Follicolare")}
-            </p>
-          </div>
-          
-          <div className="bg-white/50 dark:bg-black/20 p-4 rounded-xl backdrop-blur-sm flex flex-col justify-between">
-            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Toilette Check</span>
-            <div className="flex items-center gap-3 mt-2">
-              <Checkbox 
-                id="defecated" 
-                checked={dailyLog?.defecated || false}
-                onCheckedChange={handleDefecatedToggle}
-                className="w-6 h-6 border-2 border-primary data-[state=checked]:bg-primary"
-              />
-              <label htmlFor="defecated" className="text-sm font-medium cursor-pointer">Fatto?</label>
+        <div className="grid grid-cols-1 gap-4">
+          {/* Daily Checks personalizzati */}
+          <div className="bg-white/50 dark:bg-black/20 p-4 rounded-xl backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Check di oggi</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-[10px] text-primary font-bold"
+                onClick={() => setIsSettingsOpen(true)}
+                data-testid="button-manage-checks"
+              >
+                <Plus className="w-3 h-3 mr-1" /> Gestisci
+              </Button>
             </div>
+            {(!dailyChecks || dailyChecks.length === 0) ? (
+              <p className="text-xs text-muted-foreground italic py-2">Nessun check creato. Tocca "Gestisci" per crearne uno.</p>
+            ) : (
+              <div className="space-y-2">
+                {dailyChecks.map((check: any) => {
+                  const checked = isCheckedToday(check.id);
+                  const days = check.trackDays ? daysSinceLastCheck(check.id) : null;
+                  return (
+                    <div key={check.id} className="flex items-center justify-between gap-2" data-testid={`check-row-${check.id}`}>
+                      <button
+                        onClick={() => toggleCheckLog.mutate({ checkId: check.id, date: today, checked: !checked })}
+                        className="flex items-center gap-3 flex-1 min-w-0 group"
+                      >
+                        <div
+                          className={`w-6 h-6 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${checked ? "scale-100" : "scale-95 opacity-70 group-hover:opacity-100"}`}
+                          style={{
+                            borderColor: check.color,
+                            backgroundColor: checked ? check.color : "transparent"
+                          }}
+                        >
+                          {checked && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+                        </div>
+                        <span className={`text-sm font-medium text-left ${checked ? "" : "text-muted-foreground"}`}>{check.name}</span>
+                      </button>
+                      {check.trackDays && days !== null && days > 0 && (
+                        <span
+                          className="text-xs font-bold px-2 py-1 rounded-full shrink-0"
+                          style={{ backgroundColor: `${check.color}20`, color: check.color }}
+                          title={`${days} ${days === 1 ? "giorno" : "giorni"} dall'ultimo check`}
+                        >
+                          {days}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          <div className="col-span-2 bg-white/50 dark:bg-black/20 p-4 rounded-xl backdrop-blur-sm">
+          <div className="bg-white/50 dark:bg-black/20 p-4 rounded-xl backdrop-blur-sm">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <GlassWater className="w-4 h-4 text-primary" />
@@ -224,26 +285,73 @@ export default function Home() {
             <Button variant="ghost" size="sm" className="text-xs text-primary font-bold">Vedi tutti</Button>
           </Link>
         </h2>
-        <div className="space-y-3">
-          {reminders?.filter(r => !r.completed).slice(0, 3).map(reminder => (
-            <div key={reminder.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/30 transition-colors">
-              <Checkbox 
-                checked={reminder.completed} 
-                onCheckedChange={(checked) => updateReminder.mutate({ id: reminder.id, completed: !!checked })}
-                className="w-5 h-5 border-2 border-primary"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{reminder.title}</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {new Date(reminder.remindAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                </p>
+        {(() => {
+          const now = new Date();
+          const todayStr = format(now, "yyyy-MM-dd");
+          const incomplete = (reminders || []).filter(r => !r.completed)
+            .sort((a, b) => new Date(a.remindAt).getTime() - new Date(b.remindAt).getTime());
+          const todayItems = incomplete.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") === todayStr);
+          const upcomingItems = incomplete.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") > todayStr).slice(0, 3);
+
+          const renderItem = (reminder: any) => {
+            const remindDate = new Date(reminder.remindAt);
+            const isExpired = remindDate < now;
+            return (
+              <div
+                key={reminder.id}
+                className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                  isExpired
+                    ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30"
+                    : "border-transparent hover:bg-muted/30"
+                }`}
+                data-testid={`home-reminder-${reminder.id}`}
+              >
+                <Checkbox
+                  checked={reminder.completed}
+                  onCheckedChange={(checked) => updateReminder.mutate({ id: reminder.id, completed: !!checked })}
+                  className="w-5 h-5 border-2 border-primary mt-0.5 shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className={`font-medium text-sm break-words ${isExpired ? "text-red-700 dark:text-red-400 font-bold" : ""}`}>
+                    {reminder.title}
+                  </p>
+                  {reminder.description && (
+                    <p className="text-[11px] text-muted-foreground break-words mt-0.5">{reminder.description}</p>
+                  )}
+                  <p className={`text-[10px] mt-1 ${isExpired ? "text-red-600 dark:text-red-400 font-bold" : "text-muted-foreground"}`}>
+                    {isExpired && "⚠ SCADUTO · "}
+                    {format(remindDate, "d MMM, HH:mm", { locale: it })}
+                  </p>
+                </div>
+              </div>
+            );
+          };
+
+          return (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Oggi</h3>
+                <div className="space-y-1">
+                  {todayItems.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2 italic">Nulla per oggi</p>
+                  ) : (
+                    todayItems.map(renderItem)
+                  )}
+                </div>
+              </div>
+              <div>
+                <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Prossimi</h3>
+                <div className="space-y-1">
+                  {upcomingItems.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2 italic">Nessun prossimo promemoria</p>
+                  ) : (
+                    upcomingItems.map(renderItem)
+                  )}
+                </div>
               </div>
             </div>
-          ))}
-          {(!reminders || reminders.filter(r => !r.completed).length === 0) && (
-            <p className="text-center text-sm text-muted-foreground py-2">Tutto fatto! 🎉</p>
-          )}
-        </div>
+          );
+        })()}
       </Card>
 
       {/* Today's Meals */}
@@ -340,16 +448,21 @@ export default function Home() {
             <div className="grid grid-cols-7 gap-1">
               {days.map(day => {
                 const dateStr = format(day, "yyyy-MM-dd");
-                const logsForDay = (dailyLogs as any[])?.filter((l: any) => l.date === dateStr);
-                const hasToilet = logsForDay?.some((l: any) => l.defecated);
-                const hasCycle = logsForDay?.some((l: any) => l.menstrualPhase === "menstrual");
-                
+                const checkIdsForDay = new Set(
+                  (dailyCheckLogs || []).filter((l: any) => l.date === dateStr).map((l: any) => l.checkId)
+                );
+                const dotColors = (dailyChecks || [])
+                  .filter((c: any) => checkIdsForDay.has(c.id))
+                  .map((c: any) => c.color)
+                  .slice(0, 4);
+
                 return (
                   <div key={dateStr} className="aspect-square flex flex-col items-center justify-center relative rounded-lg hover:bg-muted/50 transition-colors">
                     <span className="text-sm font-medium">{format(day, "d")}</span>
-                    <div className="flex gap-0.5 mt-1">
-                      {hasToilet && <div className="w-1.5 h-1.5 rounded-full bg-green-500" />}
-                      {hasCycle && <div className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+                    <div className="flex gap-0.5 mt-1 flex-wrap justify-center max-w-full">
+                      {dotColors.map((color: string, idx: number) => (
+                        <div key={idx} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                      ))}
                     </div>
                   </div>
                 );
@@ -359,71 +472,117 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* Settings Dialog */}
+      {/* Daily Checks Management Dialog */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl">
+        <DialogContent className="sm:max-w-md rounded-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl">Impostazioni Ciclo</DialogTitle>
+            <DialogTitle className="font-display text-2xl">Gestisci Check Giornalieri</DialogTitle>
           </DialogHeader>
           <div className="space-y-6 py-4">
-
-            {/* Ultime mestruazioni */}
-            <div className="space-y-3">
-              <h4 className="font-bold text-sm text-muted-foreground uppercase">Ultime mestruazioni</h4>
-              <p className="text-xs text-muted-foreground">Inserisci il primo giorno dell'ultimo ciclo — la fase verrà calcolata automaticamente.</p>
-              <div className="flex gap-2">
-                <Input
-                  type="date"
-                  defaultValue={user?.lastPeriodDate ?? ""}
-                  max={today}
-                  className="rounded-xl flex-1"
-                  id="last-period-input"
-                  data-testid="input-last-period-date"
-                />
-                <Button
-                  className="rounded-xl shrink-0"
-                  onClick={() => {
-                    const val = (document.getElementById("last-period-input") as HTMLInputElement)?.value;
-                    handleLastPeriodSave(val);
-                  }}
-                  data-testid="button-save-last-period"
-                >
-                  Salva
-                </Button>
-              </div>
-              {user?.lastPeriodDate && (
-                <p className="text-xs text-primary font-medium">
-                  Ultimo ciclo: {format(new Date(user.lastPeriodDate), "d MMMM yyyy", { locale: it })}
-                </p>
+            {/* Lista check esistenti */}
+            <div className="space-y-2">
+              <h4 className="font-bold text-sm text-muted-foreground uppercase">I tuoi check</h4>
+              {(!dailyChecks || dailyChecks.length === 0) ? (
+                <p className="text-xs text-muted-foreground italic">Nessun check ancora creato.</p>
+              ) : (
+                <div className="space-y-2">
+                  {dailyChecks.map((check: any) => (
+                    <div
+                      key={check.id}
+                      className="flex items-center gap-2 p-3 rounded-xl border bg-card"
+                      data-testid={`manage-check-${check.id}`}
+                    >
+                      <div className="w-5 h-5 rounded-full shrink-0" style={{ backgroundColor: check.color }} />
+                      <Input
+                        defaultValue={check.name}
+                        className="rounded-lg h-8 flex-1"
+                        onBlur={(e) => {
+                          if (e.target.value && e.target.value !== check.name) {
+                            updateDailyCheck.mutate({ id: check.id, name: e.target.value });
+                          }
+                        }}
+                        data-testid={`input-check-name-${check.id}`}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-8 px-2 text-[10px] ${check.trackDays ? "text-primary font-bold" : "text-muted-foreground"}`}
+                        onClick={() => updateDailyCheck.mutate({ id: check.id, trackDays: !check.trackDays })}
+                        title="Conta giorni dall'ultimo check"
+                      >
+                        {check.trackDays ? "GG ON" : "GG OFF"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive shrink-0"
+                        onClick={() => {
+                          if (confirm(`Eliminare "${check.name}"? Tutti i log saranno persi.`)) {
+                            deleteDailyCheck.mutate(check.id);
+                          }
+                        }}
+                        data-testid={`button-delete-check-${check.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
-            {/* Durata media */}
-            <div className="space-y-4">
-              <h4 className="font-bold text-sm text-muted-foreground uppercase">Durata media</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold">Ciclo totale (gg)</label>
-                  <Input type="number" value={user?.cycleDuration || 28} onChange={(e) => updateUser.mutate({ cycleDuration: Number(e.target.value) })} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold">Mestruazioni (gg)</label>
-                  <Input type="number" value={user?.periodDuration || 5} onChange={(e) => updateUser.mutate({ periodDuration: Number(e.target.value) })} />
-                </div>
+            {/* Crea nuovo check */}
+            <div className="space-y-3 pt-4 border-t">
+              <h4 className="font-bold text-sm text-muted-foreground uppercase">Nuovo check</h4>
+              <Input
+                placeholder="Nome (es. Mestruazioni, Yoga...)"
+                value={newCheckName}
+                onChange={(e) => setNewCheckName(e.target.value)}
+                className="rounded-xl"
+                data-testid="input-new-check-name"
+              />
+              <div className="flex gap-2 flex-wrap">
+                {PRESET_COLORS.map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setNewCheckColor(c)}
+                    className={`w-8 h-8 rounded-full border-2 transition-transform ${newCheckColor === c ? "border-foreground scale-110" : "border-transparent"}`}
+                    style={{ backgroundColor: c }}
+                    data-testid={`color-${c}`}
+                  />
+                ))}
               </div>
-            </div>
-
-            {/* Stato manuale */}
-            <div className="space-y-4">
-              <h4 className="font-bold text-sm text-muted-foreground uppercase">Aggiorna manualmente</h4>
-              <div className="flex flex-col gap-2">
-                <Button variant="outline" className="justify-start gap-2 rounded-xl" onClick={() => handleCycleUpdate("menstrualPhase", "menstrual")}>
-                  <Droplets className="w-4 h-4 text-red-500" /> Sono iniziate oggi
-                </Button>
-                <Button variant="outline" className="justify-start gap-2 rounded-xl" onClick={() => handleCycleUpdate("menstrualPhase", "follicular")}>
-                  <X className="w-4 h-4 text-muted-foreground" /> Sono finite oggi
-                </Button>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="track-days"
+                  checked={newCheckTrack}
+                  onCheckedChange={(v) => setNewCheckTrack(!!v)}
+                  data-testid="checkbox-track-days"
+                />
+                <label htmlFor="track-days" className="text-sm cursor-pointer">
+                  Mostra contatore giorni dall'ultimo check
+                </label>
               </div>
+              <Button
+                className="w-full rounded-xl"
+                disabled={!newCheckName.trim() || createDailyCheck.isPending}
+                onClick={() => {
+                  createDailyCheck.mutate(
+                    { name: newCheckName.trim(), color: newCheckColor, trackDays: newCheckTrack },
+                    {
+                      onSuccess: () => {
+                        setNewCheckName("");
+                        setNewCheckColor("#10b981");
+                        setNewCheckTrack(false);
+                      },
+                    }
+                  );
+                }}
+                data-testid="button-create-check"
+              >
+                <Plus className="w-4 h-4 mr-2" /> Aggiungi check
+              </Button>
             </div>
           </div>
         </DialogContent>

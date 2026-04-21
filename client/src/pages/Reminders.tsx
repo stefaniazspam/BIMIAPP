@@ -196,11 +196,11 @@ export default function Reminders() {
                 data-testid={`checkbox-reminder-${reminder.id}`}
               />
               <div className="flex-1 min-w-0">
-                <p className={`font-bold text-base truncate ${reminder.completed ? "line-through text-muted-foreground" : ""}`}>
+                <p className={`font-bold text-base break-words ${reminder.completed ? "line-through text-muted-foreground" : ""}`}>
                   {reminder.title}
                 </p>
                 {reminder.description && (
-                  <p className={`text-xs mt-0.5 truncate ${reminder.completed ? "line-through text-muted-foreground/60" : "text-muted-foreground"}`}>
+                  <p className={`text-xs mt-0.5 break-words ${reminder.completed ? "line-through text-muted-foreground/60" : "text-muted-foreground"}`}>
                     {reminder.description}
                   </p>
                 )}

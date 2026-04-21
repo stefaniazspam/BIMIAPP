@@ -1,15 +1,18 @@
 import { db } from "./db";
 import {
   users, dailyLogs, meals, pantryItems, shoppingListItems, reminders, pantryCategories,
+  dailyChecks, dailyCheckLogs,
   type User, type InsertUser,
   type DailyLog, type InsertDailyLog, type UpdateDailyLogRequest,
   type Meal, type InsertMeal, type UpdateMealRequest,
   type PantryItem, type InsertPantryItem, type UpdatePantryItemRequest,
   type ShoppingListItem, type InsertShoppingListItem, type UpdateShoppingListItemRequest,
   type Reminder, type InsertReminder, type UpdateReminderRequest,
-  type PantryCategory, type InsertPantryCategory
+  type PantryCategory, type InsertPantryCategory,
+  type DailyCheck, type InsertDailyCheck, type UpdateDailyCheckRequest,
+  type DailyCheckLog, type InsertDailyCheckLog
 } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -50,6 +53,16 @@ export interface IStorage {
   createPantryCategory(category: InsertPantryCategory): Promise<PantryCategory>;
   updatePantryCategory(id: number, updates: Partial<InsertPantryCategory>): Promise<PantryCategory>;
   deletePantryCategory(id: number): Promise<void>;
+
+  // Daily Checks
+  getDailyChecks(userId: number): Promise<DailyCheck[]>;
+  createDailyCheck(check: InsertDailyCheck): Promise<DailyCheck>;
+  updateDailyCheck(id: number, updates: UpdateDailyCheckRequest): Promise<DailyCheck>;
+  deleteDailyCheck(id: number): Promise<void>;
+
+  // Daily Check Logs
+  getDailyCheckLogs(userId: number, fromDate?: string, toDate?: string): Promise<DailyCheckLog[]>;
+  setDailyCheckLog(userId: number, checkId: number, date: string, checked: boolean): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -179,6 +192,46 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(pantryCategories).set(updates).where(eq(pantryCategories.id, id)).returning();
     if (!updated) throw new Error("Category not found");
     return updated;
+  }
+
+  // ===== Daily Checks =====
+  async getDailyChecks(userId: number): Promise<DailyCheck[]> {
+    return await db.select().from(dailyChecks).where(eq(dailyChecks.userId, userId));
+  }
+
+  async createDailyCheck(check: InsertDailyCheck): Promise<DailyCheck> {
+    const [created] = await db.insert(dailyChecks).values(check).returning();
+    return created;
+  }
+
+  async updateDailyCheck(id: number, updates: UpdateDailyCheckRequest): Promise<DailyCheck> {
+    const [updated] = await db.update(dailyChecks).set(updates).where(eq(dailyChecks.id, id)).returning();
+    return updated;
+  }
+
+  async deleteDailyCheck(id: number): Promise<void> {
+    await db.delete(dailyCheckLogs).where(eq(dailyCheckLogs.checkId, id));
+    await db.delete(dailyChecks).where(eq(dailyChecks.id, id));
+  }
+
+  // ===== Daily Check Logs =====
+  async getDailyCheckLogs(userId: number): Promise<DailyCheckLog[]> {
+    return await db.select().from(dailyCheckLogs).where(eq(dailyCheckLogs.userId, userId));
+  }
+
+  async setDailyCheckLog(userId: number, checkId: number, date: string, checked: boolean): Promise<void> {
+    if (checked) {
+      const existing = await db.select().from(dailyCheckLogs).where(
+        and(eq(dailyCheckLogs.userId, userId), eq(dailyCheckLogs.checkId, checkId), eq(dailyCheckLogs.date, date))
+      );
+      if (existing.length === 0) {
+        await db.insert(dailyCheckLogs).values({ userId, checkId, date });
+      }
+    } else {
+      await db.delete(dailyCheckLogs).where(
+        and(eq(dailyCheckLogs.userId, userId), eq(dailyCheckLogs.checkId, checkId), eq(dailyCheckLogs.date, date))
+      );
+    }
   }
 
   async deletePantryCategory(id: number): Promise<void> {

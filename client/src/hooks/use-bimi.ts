@@ -433,6 +433,87 @@ export function useDeletePantryCategory() {
   });
 }
 
+// --- Daily Checks ---
+export function useDailyChecks() {
+  return useQuery<any[]>({
+    queryKey: ["/api/daily-checks"],
+    queryFn: async () => {
+      const res = await fetch("/api/daily-checks");
+      if (!res.ok) throw new Error("Failed to fetch daily checks");
+      return res.json();
+    },
+  });
+}
+
+export function useCreateDailyCheck() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { name: string; color: string; trackDays?: boolean; order?: number }) => {
+      const res = await fetch("/api/daily-checks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/daily-checks"] }),
+  });
+}
+
+export function useUpdateDailyCheck() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: number } & any) => {
+      const res = await fetch(`/api/daily-checks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/daily-checks"] }),
+  });
+}
+
+export function useDeleteDailyCheck() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      await fetch(`/api/daily-checks/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-checks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-check-logs"] });
+    },
+  });
+}
+
+export function useDailyCheckLogs() {
+  return useQuery<any[]>({
+    queryKey: ["/api/daily-check-logs"],
+    queryFn: async () => {
+      const res = await fetch("/api/daily-check-logs");
+      if (!res.ok) throw new Error("Failed to fetch daily check logs");
+      return res.json();
+    },
+  });
+}
+
+export function useToggleDailyCheckLog() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { checkId: number; date: string; checked: boolean }) => {
+      const res = await fetch("/api/daily-check-logs/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/daily-check-logs"] }),
+  });
+}
+
 // --- Chat ---
 export function useChat() {
   return useMutation({

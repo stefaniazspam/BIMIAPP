@@ -75,6 +75,7 @@ export default function Pantry() {
   const [newCategory, setNewCategory] = useState({ name: "", icon: "Archive" });
 
   const handleAddPantry = async () => {
+    if (!newItem.name.trim()) return;
     await createPantry.mutateAsync({
       userId: 1,
       name: newItem.name,
@@ -83,8 +84,22 @@ export default function Pantry() {
       quantity: newItem.quantity,
       expirationDate: newItem.date || null
     });
-    setNewItem({ name: "", quantity: "1", date: "", category: "dispensa", subCategory: "altro" });
-    setIsAddOpen(false);
+    // Pulisce SOLO il nome e la data, mantenendo il dialog aperto per inserire altri prodotti
+    setNewItem(prev => ({ ...prev, name: "", date: "" }));
+  };
+
+  const handleMoveToFreezer = async (item: any) => {
+    const updated = await updatePantry.mutateAsync({
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity,
+      expirationDate: item.expirationDate,
+      subCategory: item.subCategory,
+      category: "freezer",
+    });
+    // Apri la modifica per aggiornare la scadenza dopo lo spostamento
+    setEditingItem({ ...item, ...updated, category: "freezer" });
+    setActiveTab("freezer");
   };
 
   const [newShopItem, setNewShopItem] = useState({ name: "", subCategory: "altro" });
@@ -260,7 +275,14 @@ export default function Pantry() {
               {showExpirationsOnly ? (
                 <div className="space-y-3">
                   {(groupedPantry as any[]).map(item => (
-                    <PantryItemCard key={item.id} item={item} categories={categories} onDelete={() => deletePantry.mutate(item.id)} onEdit={() => setEditingItem(item)} />
+                    <PantryItemCard
+                      key={item.id}
+                      item={item}
+                      categories={categories}
+                      onDelete={() => deletePantry.mutate(item.id)}
+                      onEdit={() => setEditingItem(item)}
+                      onMoveToFreezer={item.category !== "freezer" ? () => handleMoveToFreezer(item) : undefined}
+                    />
                   ))}
                 </div>
               ) : (
@@ -271,7 +293,14 @@ export default function Pantry() {
                       <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{groupName}</h3>
                     </div>
                     {(items as any[]).map(item => (
-                      <PantryItemCard key={item.id} item={item} categories={categories} onDelete={() => deletePantry.mutate(item.id)} onEdit={() => setEditingItem(item)} />
+                      <PantryItemCard
+                        key={item.id}
+                        item={item}
+                        categories={categories}
+                        onDelete={() => deletePantry.mutate(item.id)}
+                        onEdit={() => setEditingItem(item)}
+                        onMoveToFreezer={cat !== "freezer" ? () => handleMoveToFreezer(item) : undefined}
+                      />
                     ))}
                   </div>
                 ))
@@ -356,13 +385,13 @@ export default function Pantry() {
   );
 }
 
-function PantryItemCard({ item, categories, onDelete, onEdit }: { item: any, categories: any[] | undefined, onDelete: () => void, onEdit: () => void }) {
+function PantryItemCard({ item, categories, onDelete, onEdit, onMoveToFreezer }: { item: any, categories: any[] | undefined, onDelete: () => void, onEdit: () => void, onMoveToFreezer?: () => void }) {
   const cat = (categories || []).find(c => c.name === item.subCategory);
   return (
     <div className="bg-card p-4 rounded-xl shadow-sm border border-border flex justify-between items-center group cursor-pointer hover:border-primary/50 transition-colors" onClick={onEdit}>
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <p className="font-bold">{item.name}</p>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-bold break-words">{item.name}</p>
           <div className="flex items-center gap-1 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase font-bold">
             {getCategoryIcon(cat?.icon || "HelpCircle")}
             <span>{item.subCategory}</span>
@@ -374,8 +403,20 @@ function PantryItemCard({ item, categories, onDelete, onEdit }: { item: any, cat
           </p>
         )}
       </div>
-      <div className="flex items-center gap-2">
-        <span className="bg-muted px-2 py-1 rounded-md text-xs font-mono">{item.quantity}</span>
+      <div className="flex items-center gap-1 shrink-0">
+        <span className="bg-muted px-2 py-1 rounded-md text-xs font-mono mr-1">{item.quantity}</span>
+        {onMoveToFreezer && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => { e.stopPropagation(); onMoveToFreezer(); }}
+            className="text-muted-foreground hover:text-sky-500 hover:bg-sky-500/10 rounded-full h-8 w-8"
+            title="Sposta in freezer"
+            data-testid={`button-move-freezer-${item.id}`}
+          >
+            <Snowflake className="w-4 h-4" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full h-8 w-8">
           <Trash2 className="w-4 h-4" />
         </Button>
