@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { it } from "date-fns/locale";
-import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, useDeleteMeal, useGenerateMeal, useAddToShoppingList, useCreateMeal, useCreatePantryItem, useCreateShoppingItem } from "@/hooks/use-bimi";
+import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, useDeleteMeal, useGenerateMeal, useAddToShoppingList, useCreateMeal, useCreatePantryItem, useCreateShoppingItem, usePantryCategories } from "@/hooks/use-bimi";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ export default function Meals() {
   const addToShoppingList = useAddToShoppingList();
   const createShoppingItem = useCreateShoppingItem();
   const createPantryItem = useCreatePantryItem();
+  const { data: pantryCategories } = usePantryCategories();
 
   const [isGenOpen, setIsGenOpen] = useState(false);
   const [isManualOpen, setIsManualOpen] = useState(false);
@@ -63,11 +64,12 @@ export default function Meals() {
   const [ingPicker, setIngPicker] = useState<{ name: string; checked: boolean; category: string }[]>([]);
 
   const openIngredientPicker = (ingredients: string[]) => {
+    const defaultCat = (pantryCategories || [])[0]?.name || "altro";
     setIngPicker(
       (ingredients || []).map(name => ({
         name: name.replace(/^[-•*\s]+/, "").trim(),
         checked: true,
-        category: "altro",
+        category: defaultCat,
       }))
     );
     setIsSelectIngOpen(true);
@@ -441,9 +443,14 @@ export default function Meals() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map(c => (
-                        <SelectItem key={c.id} value={c.id} data-testid={`option-cat-${c.id}-${idx}`}>{c.label}</SelectItem>
+                      {(pantryCategories || []).map((c: any) => (
+                        <SelectItem key={c.id} value={c.name} data-testid={`option-cat-${c.id}-${idx}`}>
+                          {c.name}
+                        </SelectItem>
                       ))}
+                      {(!pantryCategories || pantryCategories.length === 0) && (
+                        <SelectItem value="altro">altro</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
