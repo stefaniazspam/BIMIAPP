@@ -59,6 +59,31 @@ export default function Meals() {
   }, [meals]);
   const [isSelectIngOpen, setIsSelectIngOpen] = useState(false);
   const [selectedIngs, setSelectedIngs] = useState<string[]>([]);
+  const [ingPicker, setIngPicker] = useState<{ name: string; checked: boolean; category: string }[]>([]);
+
+  const openIngredientPicker = (ingredients: string[]) => {
+    setIngPicker(
+      (ingredients || []).map(name => ({
+        name: name.replace(/^[-•*\s]+/, "").trim(),
+        checked: true,
+        category: "altro",
+      }))
+    );
+    setIsSelectIngOpen(true);
+  };
+
+  const handleAddSelectedToShopping = async () => {
+    const items = ingPicker.filter(i => i.checked && i.name.trim());
+    for (const item of items) {
+      await addToShoppingList.mutateAsync({
+        userId: 1,
+        name: item.name.trim(),
+        subCategory: item.category,
+        checked: false,
+      });
+    }
+    setIsSelectIngOpen(false);
+  };
 
   const mealTypes = [
     { id: "breakfast", label: "Colazione", icon: Coffee, color: "text-orange-500", bg: "bg-orange-100" },
@@ -318,10 +343,8 @@ export default function Meals() {
               <Button 
                 variant="outline" 
                 className="w-full mt-4 rounded-xl gap-2 border-primary/20 text-primary hover:bg-primary/5"
-                onClick={() => {
-                  setSelectedIngs(viewRecipe.ingredients || []);
-                  setIsSelectIngOpen(true);
-                }}
+                onClick={() => openIngredientPicker(viewRecipe?.ingredients || [])}
+                data-testid="button-pick-ingredients"
               >
                 <Plus className="w-4 h-4" />
                 Scegli ingredienti da aggiungere alla spesa
@@ -358,7 +381,84 @@ export default function Meals() {
 
       {/* Ingredient Selector Dialog */}
       <Dialog open={isSelectIngOpen} onOpenChange={setIsSelectIngOpen}>
-        {/* ... existing dialog content ... */}
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">Aggiungi alla spesa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Spunta gli ingredienti da aggiungere e scegli la categoria per ognuno.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={() => setIngPicker(prev => prev.map(i => ({ ...i, checked: true })))}
+              >
+                Seleziona tutti
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={() => setIngPicker(prev => prev.map(i => ({ ...i, checked: false })))}
+              >
+                Deseleziona
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {ingPicker.map((item, idx) => (
+                <div
+                  key={idx}
+                  className={`flex items-center gap-2 p-2 rounded-xl border transition-colors ${item.checked ? "bg-primary/5 border-primary/30" : "bg-muted/20 border-transparent"}`}
+                  data-testid={`ing-row-${idx}`}
+                >
+                  <Checkbox
+                    checked={item.checked}
+                    onCheckedChange={(v) =>
+                      setIngPicker(prev => prev.map((p, i) => i === idx ? { ...p, checked: !!v } : p))
+                    }
+                    data-testid={`checkbox-ing-${idx}`}
+                  />
+                  <Input
+                    value={item.name}
+                    onChange={(e) =>
+                      setIngPicker(prev => prev.map((p, i) => i === idx ? { ...p, name: e.target.value } : p))
+                    }
+                    className="flex-1 h-8 rounded-lg text-sm"
+                    data-testid={`input-ing-name-${idx}`}
+                  />
+                  <Select
+                    value={item.category}
+                    onValueChange={(v) =>
+                      setIngPicker(prev => prev.map((p, i) => i === idx ? { ...p, category: v } : p))
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-[130px] rounded-lg text-xs shrink-0" data-testid={`select-category-${idx}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map(c => (
+                        <SelectItem key={c.id} value={c.id} data-testid={`option-cat-${c.id}-${idx}`}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+            <Button
+              onClick={handleAddSelectedToShopping}
+              disabled={!ingPicker.some(i => i.checked && i.name.trim()) || addToShoppingList.isPending}
+              className="w-full rounded-xl h-12 font-bold gap-2"
+              data-testid="button-confirm-add-shopping"
+            >
+              {addToShoppingList.isPending
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <><ShoppingCart className="w-4 h-4" /> Aggiungi {ingPicker.filter(i => i.checked).length} alla spesa</>}
+            </Button>
+          </div>
+        </DialogContent>
       </Dialog>
 
       {/* Add Product Category Dialog */}

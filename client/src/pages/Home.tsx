@@ -234,13 +234,13 @@ export default function Home() {
                         </div>
                         <span className={`text-sm font-medium text-left ${checked ? "" : "text-muted-foreground"}`}>{check.name}</span>
                       </button>
-                      {check.trackDays && days !== null && days > 0 && (
+                      {check.trackDays && days !== null && (
                         <span
                           className="text-xs font-bold px-2 py-1 rounded-full shrink-0"
                           style={{ backgroundColor: `${check.color}20`, color: check.color }}
-                          title={`${days} ${days === 1 ? "giorno" : "giorni"} dall'ultimo check`}
+                          title={days === 0 ? "Oggi" : `${days} ${days === 1 ? "giorno" : "giorni"} dall'ultimo check`}
                         >
-                          {days}
+                          {days === 0 ? "oggi" : `${days}g`}
                         </span>
                       )}
                     </div>
@@ -250,27 +250,6 @@ export default function Home() {
             )}
           </div>
 
-          <div className="bg-white/50 dark:bg-black/20 p-4 rounded-xl backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <GlassWater className="w-4 h-4 text-primary" />
-                <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Acqua (Bicchieri)</span>
-              </div>
-              <span className="text-xl font-bold text-primary">{dailyLog?.waterIntake || 0}/8</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-2 bg-primary/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-primary transition-all duration-300" 
-                  style={{ width: `${Math.min(100, ((dailyLog?.waterIntake || 0) / 8) * 100)}%` }}
-                />
-              </div>
-              <div className="flex gap-1">
-                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-primary/10 text-primary" onClick={() => handleWaterUpdate(-1)}>-</Button>
-                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-primary text-primary-foreground" onClick={() => handleWaterUpdate(1)}>+</Button>
-              </div>
-            </div>
-          </div>
         </div>
       </Card>
 
