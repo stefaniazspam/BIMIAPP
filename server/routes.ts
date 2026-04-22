@@ -507,7 +507,8 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
       const content = await generateJson(systemPrompt);
       res.json(content);
     } catch (err) {
-      res.status(500).json({ message: "Errore ricerca ricette" });
+      console.error("[recipes/search]", err);
+      res.status(500).json({ message: "Errore ricerca ricette: " + (err instanceof Error ? err.message : String(err)) });
     }
   });
 

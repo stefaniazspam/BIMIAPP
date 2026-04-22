@@ -7,8 +7,8 @@ if (!apiKey) {
 
 export const genAI = new GoogleGenerativeAI(apiKey || "");
 
-export const TEXT_MODEL = "gemini-2.0-flash";
-export const JSON_MODEL = "gemini-2.0-flash";
+export const TEXT_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
+export const JSON_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
