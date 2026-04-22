@@ -6,7 +6,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import OpenAI from "openai";
+import { generateJson, generateWithTools } from "./gemini";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerAudioRoutes } from "./replit_integrations/audio";
 import webpush from "web-push";
@@ -18,11 +18,6 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
     process.env.VAPID_PRIVATE_KEY
   );
 }
-
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -63,104 +58,76 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
 
       const tools = [
         {
-          type: "function" as const,
-          function: {
-            name: "add_shopping_list_item",
-            description: "Aggiungi un elemento alla lista della spesa",
-            parameters: {
-              type: "object",
-              properties: {
-                name: { type: "string" },
-                quantity: { type: "number" }
-              },
-              required: ["name"]
-            }
+          name: "add_shopping_list_item",
+          description: "Aggiungi un elemento alla lista della spesa",
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              quantity: { type: "number" }
+            },
+            required: ["name"]
           }
         },
         {
-          type: "function" as const,
-          function: {
-            name: "clear_shopping_list",
-            description: "Cancella completamente la lista della spesa",
-            parameters: {
-              type: "object",
-              properties: {}
-            }
-          }
+          name: "clear_shopping_list",
+          description: "Cancella completamente la lista della spesa",
+          parameters: { type: "object", properties: {} }
         },
         {
-          type: "function" as const,
-          function: {
-            name: "add_reminder",
-            description: "Aggiungi un promemoria (es: fra 5 minuti, domani alle 15, ecc). Calcola sempre l'orario esatto basandoti sull'ora corrente.",
-            parameters: {
-              type: "object",
-              properties: {
-                title: { type: "string" },
-                remindAt: { type: "string", description: "ISO 8601 date string for the exact reminder time. If the user says 'tra X minuti', calculate NOW + X minutes." }
-              },
-              required: ["title", "remindAt"]
-            }
+          name: "add_reminder",
+          description: "Aggiungi un promemoria (es: fra 5 minuti, domani alle 15, ecc). Calcola sempre l'orario esatto basandoti sull'ora corrente.",
+          parameters: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              remindAt: { type: "string", description: "ISO 8601 date string for the exact reminder time. If the user says 'tra X minuti', calculate NOW + X minutes." }
+            },
+            required: ["title", "remindAt"]
           }
         }
       ];
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage }
-        ],
-        tools: tools,
-        tool_choice: "auto",
-      });
+      const { text, calls } = await generateWithTools(systemPrompt, userMessage, tools);
+      let finalResponse = text || "Fatto!";
 
-      const message = response.choices[0].message;
-      let finalResponse = message.content || "Fatto!";
-
-      if (message.tool_calls) {
-        for (const toolCall of message.tool_calls) {
-          if (toolCall.type === 'function' && toolCall.function.name === "add_shopping_list_item") {
-            const args = JSON.parse(toolCall.function.arguments);
-            await storage.createShoppingListItem({
-              userId: 1,
-              name: args.name,
-              quantity: args.quantity || 1,
-              checked: false
-            });
-            finalResponse = `Ho aggiunto ${args.quantity || 1}x ${args.name} alla tua lista della spesa!`;
-          } else if (toolCall.type === 'function' && toolCall.function.name === "clear_shopping_list") {
-            const items = await storage.getShoppingListItems();
-            for (const item of items) {
-              await storage.deleteShoppingListItem(item.id);
-            }
-            finalResponse = "Ho svuotato completamente la tua lista della spesa.";
-          } else if (toolCall.type === 'function' && toolCall.function.name === "add_reminder") {
-            const args = JSON.parse(toolCall.function.arguments);
-            // Handle relative time like "tra 5 minuti" or absolute ISO string
-            let remindDate: Date;
-            if (args.remindAt.includes('minutes') || args.remindAt.match(/^\d+$/)) {
-               const mins = parseInt(args.remindAt);
-               remindDate = new Date(Date.now() + mins * 60000);
-            } else {
-               remindDate = new Date(args.remindAt);
-            }
-            
-            if (isNaN(remindDate.getTime())) {
-              // Fallback for LLM hallucinating relative text
-              const minsMatch = args.remindAt.match(/(\d+)/);
-              const mins = minsMatch ? parseInt(minsMatch[0]) : 5;
-              remindDate = new Date(Date.now() + mins * 60000);
-            }
-
-            await storage.createReminder({
-              userId: 1,
-              title: args.title,
-              remindAt: remindDate,
-              completed: false
-            });
-            finalResponse = `Perfetto, ti ricorderò: "${args.title}" il ${remindDate.toLocaleString('it-IT')}.`;
+      for (const call of calls) {
+        if (call.name === "add_shopping_list_item") {
+          const args = call.args;
+          await storage.createShoppingListItem({
+            userId: 1,
+            name: args.name,
+            quantity: String(args.quantity || 1),
+            checked: false
+          });
+          finalResponse = `Ho aggiunto ${args.quantity || 1}x ${args.name} alla tua lista della spesa!`;
+        } else if (call.name === "clear_shopping_list") {
+          const items = await storage.getShoppingListItems();
+          for (const item of items) {
+            await storage.deleteShoppingListItem(item.id);
           }
+          finalResponse = "Ho svuotato completamente la tua lista della spesa.";
+        } else if (call.name === "add_reminder") {
+          const args = call.args;
+          let remindDate: Date;
+          if (typeof args.remindAt === "string" && (args.remindAt.includes('minutes') || args.remindAt.match(/^\d+$/))) {
+            const mins = parseInt(args.remindAt);
+            remindDate = new Date(Date.now() + mins * 60000);
+          } else {
+            remindDate = new Date(args.remindAt);
+          }
+          if (isNaN(remindDate.getTime())) {
+            const minsMatch = String(args.remindAt || "").match(/(\d+)/);
+            const mins = minsMatch ? parseInt(minsMatch[0]) : 5;
+            remindDate = new Date(Date.now() + mins * 60000);
+          }
+          await storage.createReminder({
+            userId: 1,
+            title: args.title,
+            remindAt: remindDate,
+            completed: false
+          });
+          finalResponse = `Perfetto, ti ricorderò: "${args.title}" il ${remindDate.toLocaleString('it-IT')}.`;
         }
       }
 
@@ -496,13 +463,7 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
         "ingredients": ["ingrediente 1", "ingrediente 2"]
       }`;
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o", // Using 4o for reliable JSON
-        messages: [{ role: "system", content: systemPrompt }],
-        response_format: { type: "json_object" }
-      });
-
-      const content = JSON.parse(response.choices[0].message.content || "{}");
+      const content = await generateJson<{ name: string; recipe: string; ingredients: string[] }>(systemPrompt);
       
       const meal = await storage.createMeal({
         userId: 1,
@@ -543,13 +504,8 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
         ]
       }`;
 
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "system", content: systemPrompt }],
-        response_format: { type: "json_object" }
-      });
-
-      res.json(JSON.parse(response.choices[0].message.content || "{}"));
+      const content = await generateJson(systemPrompt);
+      res.json(content);
     } catch (err) {
       res.status(500).json({ message: "Errore ricerca ricette" });
     }

@@ -102,7 +102,38 @@ export default function Pantry() {
     setActiveTab("freezer");
   };
 
+  const handleMoveToFridge = async (item: any) => {
+    const tomorrow = format(new Date(Date.now() + 24 * 60 * 60 * 1000), "yyyy-MM-dd");
+    const updated = await updatePantry.mutateAsync({
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity,
+      expirationDate: tomorrow,
+      subCategory: item.subCategory,
+      category: "frigo",
+    });
+    setEditingItem({ ...item, ...updated, category: "frigo", expirationDate: tomorrow });
+    setActiveTab("frigo");
+  };
+
   const [newShopItem, setNewShopItem] = useState({ name: "", subCategory: "altro" });
+  const [movingShopItem, setMovingShopItem] = useState<any>(null);
+  const [moveTarget, setMoveTarget] = useState({ category: "dispensa", quantity: "1", expirationDate: "", subCategory: "altro" });
+
+  const handleMoveShoppingToPantry = async () => {
+    if (!movingShopItem) return;
+    await createPantry.mutateAsync({
+      userId: 1,
+      name: movingShopItem.name,
+      category: moveTarget.category,
+      subCategory: moveTarget.subCategory,
+      quantity: moveTarget.quantity,
+      expirationDate: moveTarget.expirationDate || null,
+    });
+    await deleteShopping.mutateAsync(movingShopItem.id);
+    setMovingShopItem(null);
+    setActiveTab(moveTarget.category);
+  };
 
   const handleAddShopping = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,6 +331,7 @@ export default function Pantry() {
                         onDelete={() => deletePantry.mutate(item.id)}
                         onEdit={() => setEditingItem(item)}
                         onMoveToFreezer={cat !== "freezer" ? () => handleMoveToFreezer(item) : undefined}
+                        onMoveToFridge={cat === "freezer" ? () => handleMoveToFridge(item) : undefined}
                       />
                     ))}
                   </div>
@@ -334,14 +366,14 @@ export default function Pantry() {
             <div className="space-y-2">
               {getSortedShopping().map(item => (
                 <div key={item.id} className="flex items-center justify-between bg-card p-3 rounded-xl border border-border shadow-sm">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <Checkbox 
                       checked={item.checked || false} 
                       onCheckedChange={(checked) => updateShopping.mutate({ id: item.id, checked: !!checked })}
-                      className="rounded-md border-2 border-primary data-[state=checked]:bg-primary"
+                      className="rounded-md border-2 border-primary data-[state=checked]:bg-primary shrink-0"
                     />
-                    <div>
-                      <span className={item.checked ? "line-through text-muted-foreground" : "font-medium"}>
+                    <div className="min-w-0">
+                      <span className={item.checked ? "line-through text-muted-foreground break-words" : "font-medium break-words"}>
                         {item.name}
                       </span>
                       <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-bold">
@@ -350,9 +382,31 @@ export default function Pantry() {
                       </div>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => deleteShopping.mutate(item.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive rounded-full">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {item.checked && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setMovingShopItem(item);
+                          setMoveTarget({
+                            category: "dispensa",
+                            quantity: item.quantity || "1",
+                            expirationDate: "",
+                            subCategory: item.subCategory || "altro",
+                          });
+                        }}
+                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
+                        title="Sposta in dispensa"
+                        data-testid={`button-move-to-pantry-${item.id}`}
+                      >
+                        <Archive className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" onClick={() => deleteShopping.mutate(item.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive rounded-full">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -381,11 +435,53 @@ export default function Pantry() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!movingShopItem} onOpenChange={() => setMovingShopItem(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Sposta "{movingShopItem?.name}" in:</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Tabs value={moveTarget.category} onValueChange={(v) => setMoveTarget({ ...moveTarget, category: v })}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="dispensa" data-testid="tab-move-dispensa"><Archive className="w-4 h-4 mr-1" />Dispensa</TabsTrigger>
+                <TabsTrigger value="frigo" data-testid="tab-move-frigo"><Refrigerator className="w-4 h-4 mr-1" />Frigo</TabsTrigger>
+                <TabsTrigger value="freezer" data-testid="tab-move-freezer"><Snowflake className="w-4 h-4 mr-1" />Freezer</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Select value={moveTarget.subCategory} onValueChange={(v) => setMoveTarget({ ...moveTarget, subCategory: v })}>
+              <SelectTrigger className="rounded-xl" data-testid="select-move-subcategory"><SelectValue placeholder="Categoria" /></SelectTrigger>
+              <SelectContent>
+                {(categories || []).map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                placeholder="Quantità"
+                value={moveTarget.quantity}
+                onChange={(e) => setMoveTarget({ ...moveTarget, quantity: e.target.value })}
+                className="rounded-xl"
+                data-testid="input-move-quantity"
+              />
+              <Input
+                type="date"
+                value={moveTarget.expirationDate}
+                onChange={(e) => setMoveTarget({ ...moveTarget, expirationDate: e.target.value })}
+                className="rounded-xl"
+                data-testid="input-move-expiration"
+              />
+            </div>
+            <Button onClick={handleMoveShoppingToPantry} className="rounded-xl font-bold" data-testid="button-confirm-move-to-pantry">
+              Sposta in {moveTarget.category}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function PantryItemCard({ item, categories, onDelete, onEdit, onMoveToFreezer }: { item: any, categories: any[] | undefined, onDelete: () => void, onEdit: () => void, onMoveToFreezer?: () => void }) {
+function PantryItemCard({ item, categories, onDelete, onEdit, onMoveToFreezer, onMoveToFridge }: { item: any, categories: any[] | undefined, onDelete: () => void, onEdit: () => void, onMoveToFreezer?: () => void, onMoveToFridge?: () => void }) {
   const cat = (categories || []).find(c => c.name === item.subCategory);
   return (
     <div className="bg-card p-4 rounded-xl shadow-sm border border-border flex justify-between items-center group cursor-pointer hover:border-primary/50 transition-colors" onClick={onEdit}>
@@ -415,6 +511,18 @@ function PantryItemCard({ item, categories, onDelete, onEdit, onMoveToFreezer }:
             data-testid={`button-move-freezer-${item.id}`}
           >
             <Snowflake className="w-4 h-4" />
+          </Button>
+        )}
+        {onMoveToFridge && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => { e.stopPropagation(); onMoveToFridge(); }}
+            className="text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 rounded-full h-8 w-8"
+            title="Sposta in frigo (scadenza domani)"
+            data-testid={`button-move-fridge-${item.id}`}
+          >
+            <Refrigerator className="w-4 h-4" />
           </Button>
         )}
         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full h-8 w-8">

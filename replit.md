@@ -25,7 +25,7 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express 5
 - **Language**: TypeScript, executed via `tsx` in development
 - **API Pattern**: RESTful JSON API under `/api/*` prefix. Route definitions with Zod schemas are shared between client and server in `shared/routes.ts`
-- **AI Integration**: OpenAI SDK configured via Replit AI Integrations environment variables (`AI_INTEGRATIONS_OPENAI_API_KEY`, `AI_INTEGRATIONS_OPENAI_BASE_URL`). Used for chat responses with function calling (add shopping items, reminders), recipe generation, speech-to-text, text-to-speech, and image generation
+- **AI Integration**: Google Gemini via `@google/generative-ai` SDK (`GEMINI_API_KEY`). Helper module at `server/gemini.ts` exposes `generateText`, `generateJson`, `generateWithTools` (function calling), `streamText`, and `transcribeAudio`. Used for chat with tools (add shopping items, reminders), recipe generation, and speech-to-text. Text-to-speech is handled client-side via the browser Web Speech API
 - **Build**: Custom build script (`script/build.ts`) using Vite for client and esbuild for server, outputting to `dist/`
 
 ### Data Storage

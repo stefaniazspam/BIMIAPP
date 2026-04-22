@@ -468,42 +468,56 @@ export default function Home() {
                   {dailyChecks.map((check: any) => (
                     <div
                       key={check.id}
-                      className="flex items-center gap-2 p-3 rounded-xl border bg-card"
+                      className="space-y-2 p-3 rounded-xl border bg-card"
                       data-testid={`manage-check-${check.id}`}
                     >
-                      <div className="w-5 h-5 rounded-full shrink-0" style={{ backgroundColor: check.color }} />
-                      <Input
-                        defaultValue={check.name}
-                        className="rounded-lg h-8 flex-1"
-                        onBlur={(e) => {
-                          if (e.target.value && e.target.value !== check.name) {
-                            updateDailyCheck.mutate({ id: check.id, name: e.target.value });
-                          }
-                        }}
-                        data-testid={`input-check-name-${check.id}`}
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={`h-8 px-2 text-[10px] ${check.trackDays ? "text-primary font-bold" : "text-muted-foreground"}`}
-                        onClick={() => updateDailyCheck.mutate({ id: check.id, trackDays: !check.trackDays })}
-                        title="Conta giorni dall'ultimo check"
-                      >
-                        {check.trackDays ? "GG ON" : "GG OFF"}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive shrink-0"
-                        onClick={() => {
-                          if (confirm(`Eliminare "${check.name}"? Tutti i log saranno persi.`)) {
-                            deleteDailyCheck.mutate(check.id);
-                          }
-                        }}
-                        data-testid={`button-delete-check-${check.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full shrink-0" style={{ backgroundColor: check.color }} />
+                        <Input
+                          defaultValue={check.name}
+                          className="rounded-lg h-8 flex-1"
+                          onBlur={(e) => {
+                            if (e.target.value && e.target.value !== check.name) {
+                              updateDailyCheck.mutate({ id: check.id, name: e.target.value });
+                            }
+                          }}
+                          data-testid={`input-check-name-${check.id}`}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`h-8 px-2 text-[10px] ${check.trackDays ? "text-primary font-bold" : "text-muted-foreground"}`}
+                          onClick={() => updateDailyCheck.mutate({ id: check.id, trackDays: !check.trackDays })}
+                          title="Conta giorni dall'ultimo check"
+                        >
+                          {check.trackDays ? "GG ON" : "GG OFF"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive shrink-0"
+                          onClick={() => {
+                            if (confirm(`Eliminare "${check.name}"? Tutti i log saranno persi.`)) {
+                              deleteDailyCheck.mutate(check.id);
+                            }
+                          }}
+                          data-testid={`button-delete-check-${check.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="flex gap-1.5 flex-wrap pl-7">
+                        {PRESET_COLORS.map(c => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => updateDailyCheck.mutate({ id: check.id, color: c })}
+                            className={`w-6 h-6 rounded-full border-2 transition-transform ${check.color === c ? "border-foreground scale-110" : "border-transparent"}`}
+                            style={{ backgroundColor: c }}
+                            data-testid={`edit-color-${check.id}-${c}`}
+                          />
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>

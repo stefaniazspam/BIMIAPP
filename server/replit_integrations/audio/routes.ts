@@ -1,6 +1,7 @@
 import express, { type Express, type Request, type Response } from "express";
 import { chatStorage } from "../chat/storage";
-import { openai, speechToText, ensureCompatibleFormat } from "./client";
+import { speechToText, ensureCompatibleFormat } from "./client";
+import { generateText } from "../../gemini";
 
 // Body parser with 50MB limit for audio payloads
 const audioBodyParser = express.json({ limit: "50mb" });
@@ -110,30 +111,16 @@ export function registerAudioRoutes(app: Express): void {
 
       res.write(`data: ${JSON.stringify({ type: "user_transcript", data: userTranscript })}\n\n`);
 
-      // 6. Stream audio response from gpt-audio
-      const stream = await openai.chat.completions.create({
-        model: "gpt-audio",
-        modalities: ["text", "audio"],
-        audio: { voice, format: "pcm16" },
-        messages: chatHistory,
-        stream: true,
-      });
+      // 6. Generate text response with Gemini (audio output handled client-side via Web Speech API)
+      const conversationContext = chatHistory
+        .map((m) => `${m.role === "user" ? "Utente" : "Assistente"}: ${m.content}`)
+        .join("\n");
+      const assistantTranscript = await generateText(
+        "Sei un assistente vocale utile. Rispondi in italiano in modo conciso e naturale.",
+        conversationContext
+      );
 
-      let assistantTranscript = "";
-
-      for await (const chunk of stream) {
-        const delta = chunk.choices?.[0]?.delta as any;
-        if (!delta) continue;
-
-        if (delta?.audio?.transcript) {
-          assistantTranscript += delta.audio.transcript;
-          res.write(`data: ${JSON.stringify({ type: "transcript", data: delta.audio.transcript })}\n\n`);
-        }
-
-        if (delta?.audio?.data) {
-          res.write(`data: ${JSON.stringify({ type: "audio", data: delta.audio.data })}\n\n`);
-        }
-      }
+      res.write(`data: ${JSON.stringify({ type: "transcript", data: assistantTranscript })}\n\n`);
 
       // 7. Save assistant message
       await chatStorage.createMessage(conversationId, "assistant", assistantTranscript);
