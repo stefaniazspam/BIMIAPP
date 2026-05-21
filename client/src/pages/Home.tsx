@@ -1,4 +1,4 @@
-import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addHours, parseISO } from "date-fns";
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, differenceInDays, isToday, isTomorrow } from "date-fns";
 import { it } from "date-fns/locale";
 import {
   useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, usePantryItems, useReminders, useUser, useUpdateUser,
@@ -7,7 +7,6 @@ import {
 } from "@/hooks/use-bimi";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { differenceInDays, isToday, isTomorrow } from "date-fns";
 import { GlassWater } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,7 +23,6 @@ const getExpirationLabel = (date: string) => {
   const exp = new Date(date);
   const today = new Date();
   const diff = differenceInDays(exp, today);
-  
   if (isToday(exp)) return "OGGI";
   if (isTomorrow(exp)) return "DOMANI";
   if (diff === 2) return "DOPODOMANI";
@@ -38,7 +36,7 @@ export default function Home() {
   const { data: user } = useUser();
   const { data: dailyLog, isLoading: logLoading } = useDailyLog(today);
   const { data: dailyLogs } = useDailyLogs();
-  const { data: meals, isLoading: mealsLoading } = useMeals(); // Fetch all for calendar
+  const { data: meals, isLoading: mealsLoading } = useMeals();
   const { data: pantry } = usePantryItems();
   const { data: reminders } = useReminders();
   const { data: dailyChecks } = useDailyChecks();
@@ -50,8 +48,10 @@ export default function Home() {
   const upsertLog = useUpsertDailyLog();
   const updateUser = useUpdateUser();
 
-  const isCheckedToday = (checkId: number) =>
-    (dailyCheckLogs || []).some((l: any) => l.checkId === checkId && l.date === today);
+  const isCheckedOnDate = (checkId: number, dateStr: string) =>
+    (dailyCheckLogs || []).some((l: any) => l.checkId === checkId && l.date === dateStr);
+
+  const isCheckedToday = (checkId: number) => isCheckedOnDate(checkId, today);
 
   const daysSinceLastCheck = (checkId: number): number | null => {
     const logs = (dailyCheckLogs || []).filter((l: any) => l.checkId === checkId).map((l: any) => l.date).sort().reverse();
@@ -66,7 +66,7 @@ export default function Home() {
   const [newCheckTrack, setNewCheckTrack] = useState(false);
 
   const PRESET_COLORS = ["#ef4444", "#f97316", "#eab308", "#10b981", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899"];
-  
+
   const queryClient = useQueryClient();
   const updateReminder = useMutation({
     mutationFn: async ({ id, completed }: { id: number; completed: boolean }) => {
@@ -80,7 +80,8 @@ export default function Home() {
 
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
-  
+  const [selectedCalDay, setSelectedCalDay] = useState<string | null>(null);
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNameEditing, setIsNameEditing] = useState(false);
   const [newName, setNewName] = useState(user?.username || "Stefania");
@@ -102,12 +103,7 @@ export default function Home() {
   };
 
   const handleCycleUpdate = (key: string, value: any) => {
-    upsertLog.mutate({
-      userId: 1,
-      date: today,
-      ...dailyLog,
-      [key]: value
-    });
+    upsertLog.mutate({ userId: 1, date: today, ...dailyLog, [key]: value });
   };
 
   const calculatePhaseFromLastPeriod = (lastPeriodDateStr: string): string => {
@@ -130,19 +126,11 @@ export default function Home() {
     upsertLog.mutate({ userId: 1, date: today, ...dailyLog, menstrualPhase: phase });
   };
 
-  const handleWaterUpdate = (amount: number) => {
-    const currentWater = dailyLog?.waterIntake || 0;
-    upsertLog.mutate({
-      userId: 1,
-      date: today,
-      ...dailyLog,
-      waterIntake: Math.max(0, currentWater + amount)
-    });
-  };
-
   const monthStart = startOfMonth(calendarMonth);
   const monthEnd = endOfMonth(calendarMonth);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  // Italian week starts Monday: offset 0=Mon, 6=Sun
+  const firstDayOffset = (monthStart.getDay() + 6) % 7;
 
   return (
     <div className="space-y-6 pb-20">
@@ -150,8 +138,8 @@ export default function Home() {
         <div>
           {isNameEditing ? (
             <div className="flex items-center gap-2">
-              <Input 
-                value={newName} 
+              <Input
+                value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 className="text-2xl font-display font-bold text-primary h-10 w-48 bg-transparent border-b-2 border-primary rounded-none focus-visible:ring-0 px-0"
                 autoFocus
@@ -160,12 +148,9 @@ export default function Home() {
               />
             </div>
           ) : (
-            <h1 
+            <h1
               className="text-3xl font-display font-bold text-primary cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => {
-                setNewName(user?.username || "Stefania");
-                setIsNameEditing(true);
-              }}
+              onClick={() => { setNewName(user?.username || "Stefania"); setIsNameEditing(true); }}
             >
               Ciao, {user?.username || "Stefania"}!
             </h1>
@@ -174,9 +159,9 @@ export default function Home() {
             {format(new Date(), "EEEE d MMMM", { locale: it })}
           </p>
         </div>
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center"
           onClick={() => setIsCalendarOpen(true)}
         >
@@ -194,9 +179,8 @@ export default function Home() {
             <Settings className="w-4 h-4 text-muted-foreground" />
           </Button>
         </div>
-        
+
         <div className="grid grid-cols-1 gap-4">
-          {/* Daily Checks personalizzati */}
           <div className="bg-white/50 dark:bg-black/20 p-4 rounded-xl backdrop-blur-sm">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Check di oggi</span>
@@ -225,10 +209,7 @@ export default function Home() {
                       >
                         <div
                           className={`w-6 h-6 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${checked ? "scale-100" : "scale-95 opacity-70 group-hover:opacity-100"}`}
-                          style={{
-                            borderColor: check.color,
-                            backgroundColor: checked ? check.color : "transparent"
-                          }}
+                          style={{ borderColor: check.color, backgroundColor: checked ? check.color : "transparent" }}
                         >
                           {checked && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
                         </div>
@@ -249,7 +230,6 @@ export default function Home() {
               </div>
             )}
           </div>
-
         </div>
       </Card>
 
@@ -269,20 +249,20 @@ export default function Home() {
           const todayStr = format(now, "yyyy-MM-dd");
           const incomplete = (reminders || []).filter(r => !r.completed)
             .sort((a, b) => new Date(a.remindAt).getTime() - new Date(b.remindAt).getTime());
-          const todayItems = incomplete.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") === todayStr);
+
+          // Today = today's date items; Overdue = past days items (not today)
+          const todayItems = incomplete.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") >= todayStr);
+          const overdueItems = incomplete.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") < todayStr);
           const upcomingItems = incomplete.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") > todayStr).slice(0, 3);
 
-          const renderItem = (reminder: any) => {
+          const renderItem = (reminder: any, forceRed = false) => {
             const remindDate = new Date(reminder.remindAt);
             const isExpired = remindDate < now;
+            const showRed = isExpired || forceRed;
             return (
               <div
                 key={reminder.id}
-                className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
-                  isExpired
-                    ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30"
-                    : "border-transparent hover:bg-muted/30"
-                }`}
+                className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${showRed ? "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30" : "border-transparent hover:bg-muted/30"}`}
                 data-testid={`home-reminder-${reminder.id}`}
               >
                 <Checkbox
@@ -291,14 +271,14 @@ export default function Home() {
                   className="w-5 h-5 border-2 border-primary mt-0.5 shrink-0"
                 />
                 <div className="flex-1 min-w-0">
-                  <p className={`font-medium text-sm break-words ${isExpired ? "text-red-700 dark:text-red-400 font-bold" : ""}`}>
+                  <p className={`font-medium text-sm break-words ${showRed ? "text-red-700 dark:text-red-400 font-bold" : ""}`}>
                     {reminder.title}
                   </p>
                   {reminder.description && (
                     <p className="text-[11px] text-muted-foreground break-words mt-0.5">{reminder.description}</p>
                   )}
-                  <p className={`text-[10px] mt-1 ${isExpired ? "text-red-600 dark:text-red-400 font-bold" : "text-muted-foreground"}`}>
-                    {isExpired && "⚠ SCADUTO · "}
+                  <p className={`text-[10px] mt-1 ${showRed ? "text-red-600 dark:text-red-400 font-bold" : "text-muted-foreground"}`}>
+                    {showRed && "SCADUTO · "}
                     {format(remindDate, "d MMM, HH:mm", { locale: it })}
                   </p>
                 </div>
@@ -309,12 +289,12 @@ export default function Home() {
           return (
             <div className="space-y-4">
               <div>
-                <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Oggi</h3>
+                <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Oggi e in ritardo</h3>
                 <div className="space-y-1">
-                  {todayItems.length === 0 ? (
+                  {overdueItems.map(r => renderItem(r, true))}
+                  {todayItems.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") === todayStr).map(r => renderItem(r))}
+                  {overdueItems.length === 0 && todayItems.filter(r => format(new Date(r.remindAt), "yyyy-MM-dd") === todayStr).length === 0 && (
                     <p className="text-xs text-muted-foreground py-2 italic">Nulla per oggi</p>
-                  ) : (
-                    todayItems.map(renderItem)
                   )}
                 </div>
               </div>
@@ -324,7 +304,7 @@ export default function Home() {
                   {upcomingItems.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-2 italic">Nessun prossimo promemoria</p>
                   ) : (
-                    upcomingItems.map(renderItem)
+                    upcomingItems.map(r => renderItem(r))
                   )}
                 </div>
               </div>
@@ -339,11 +319,8 @@ export default function Home() {
           <Utensils className="w-5 h-5 text-primary" />
           I miei pasti di oggi
         </h2>
-        
         {mealsLoading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-12 w-full rounded-xl" />
-          </div>
+          <div className="space-y-3"><Skeleton className="h-12 w-full rounded-xl" /></div>
         ) : meals?.filter(m => m.date === today && m.isPlanned).length === 0 ? (
           <div className="text-center py-6 border-2 border-dashed border-muted rounded-2xl">
             <p className="text-sm text-muted-foreground mb-3">Nessuna ricetta per oggi</p>
@@ -357,10 +334,6 @@ export default function Home() {
                   <ChefHat className="w-4 h-4 text-primary" />
                   <div>
                     <p className="font-bold text-sm">{meal.name}</p>
-                    <div className="flex gap-1 mt-1">
-                      {dailyLog?.defecated && <div className="w-2 h-2 rounded-full bg-green-500" title="Toilette Check" />}
-                      {dailyLog?.menstrualPhase === "menstrual" && <div className="w-2 h-2 rounded-full bg-red-500" title="Ciclo" />}
-                    </div>
                   </div>
                 </div>
                 <ArrowRight className="w-4 h-4 text-primary" />
@@ -375,7 +348,6 @@ export default function Home() {
           <AlertCircle className="w-5 h-5" />
           Prossime Scadenze
         </h3>
-        
         <div className="grid gap-3">
           {pantry?.filter(item => {
             if (!item.expirationDate) return false;
@@ -395,13 +367,11 @@ export default function Home() {
               </div>
             </div>
           ))}
-
           {!pantry?.some(item => {
             if (!item.expirationDate) return false;
             const expDate = new Date(item.expirationDate);
             const todayDate = new Date(today);
-            const threeDaysFromNow = addDays(todayDate, 3);
-            return expDate >= todayDate && expDate <= threeDaysFromNow;
+            return expDate >= todayDate && expDate <= addDays(todayDate, 3);
           }) && (
             <p className="text-sm text-muted-foreground text-center py-4">Nulla in scadenza nei prossimi 3 giorni</p>
           )}
@@ -420,11 +390,15 @@ export default function Home() {
               </div>
             </div>
             <div className="grid grid-cols-7 text-center text-xs font-bold opacity-70">
-              {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map(d => <div key={d}>{d}</div>)}
+              {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => <div key={i}>{d}</div>)}
             </div>
           </div>
           <div className="p-4 bg-background">
             <div className="grid grid-cols-7 gap-1">
+              {/* Empty offset cells so the 1st falls on the correct weekday */}
+              {Array.from({ length: firstDayOffset }).map((_, i) => (
+                <div key={`empty-${i}`} className="aspect-square" />
+              ))}
               {days.map(day => {
                 const dateStr = format(day, "yyyy-MM-dd");
                 const checkIdsForDay = new Set(
@@ -434,19 +408,68 @@ export default function Home() {
                   .filter((c: any) => checkIdsForDay.has(c.id))
                   .map((c: any) => c.color)
                   .slice(0, 4);
+                const isSelected = dateStr === today;
 
                 return (
-                  <div key={dateStr} className="aspect-square flex flex-col items-center justify-center relative rounded-lg hover:bg-muted/50 transition-colors">
-                    <span className="text-sm font-medium">{format(day, "d")}</span>
-                    <div className="flex gap-0.5 mt-1 flex-wrap justify-center max-w-full">
+                  <button
+                    key={dateStr}
+                    onClick={() => setSelectedCalDay(dateStr)}
+                    className={`aspect-square flex flex-col items-center justify-center relative rounded-lg transition-colors hover:bg-primary/10 ${isSelected ? "bg-primary/20 ring-2 ring-primary" : ""}`}
+                  >
+                    <span className={`text-sm font-medium ${isSelected ? "text-primary font-bold" : ""}`}>{format(day, "d")}</span>
+                    <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center max-w-full">
                       {dotColors.map((color: string, idx: number) => (
                         <div key={idx} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
                       ))}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
+            <p className="text-[10px] text-muted-foreground text-center mt-3">Tocca un giorno per vedere o modificare i check</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Day Check Toggle Dialog */}
+      <Dialog open={!!selectedCalDay} onOpenChange={() => setSelectedCalDay(null)}>
+        <DialogContent className="sm:max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl capitalize">
+              {selectedCalDay ? format(new Date(selectedCalDay + "T12:00:00"), "EEEE d MMMM", { locale: it }) : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {(!dailyChecks || dailyChecks.length === 0) ? (
+              <p className="text-sm text-muted-foreground italic">Nessun check configurato.</p>
+            ) : (
+              dailyChecks.map((check: any) => {
+                const checked = selectedCalDay ? isCheckedOnDate(check.id, selectedCalDay) : false;
+                return (
+                  <button
+                    key={check.id}
+                    onClick={() => {
+                      if (!selectedCalDay) return;
+                      toggleCheckLog.mutate({ checkId: check.id, date: selectedCalDay, checked: !checked });
+                    }}
+                    className="flex items-center gap-3 w-full p-3 rounded-xl border transition-all hover:bg-muted/30"
+                    style={{ borderColor: checked ? check.color : undefined }}
+                    data-testid={`day-check-toggle-${check.id}`}
+                  >
+                    <div
+                      className="w-7 h-7 rounded-full border-2 shrink-0 flex items-center justify-center transition-all"
+                      style={{ borderColor: check.color, backgroundColor: checked ? check.color : "transparent" }}
+                    >
+                      {checked && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
+                    </div>
+                    <span className={`text-sm font-medium flex-1 text-left ${checked ? "font-bold" : "text-muted-foreground"}`}>{check.name}</span>
+                    <span className="text-xs font-bold" style={{ color: checked ? check.color : "#aaa" }}>
+                      {checked ? "Fatto" : "Non fatto"}
+                    </span>
+                  </button>
+                );
+              })
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -458,7 +481,6 @@ export default function Home() {
             <DialogTitle className="font-display text-2xl">Gestisci Check Giornalieri</DialogTitle>
           </DialogHeader>
           <div className="space-y-6 py-4">
-            {/* Lista check esistenti */}
             <div className="space-y-2">
               <h4 className="font-bold text-sm text-muted-foreground uppercase">I tuoi check</h4>
               {(!dailyChecks || dailyChecks.length === 0) ? (
@@ -466,11 +488,7 @@ export default function Home() {
               ) : (
                 <div className="space-y-2">
                   {dailyChecks.map((check: any) => (
-                    <div
-                      key={check.id}
-                      className="space-y-2 p-3 rounded-xl border bg-card"
-                      data-testid={`manage-check-${check.id}`}
-                    >
+                    <div key={check.id} className="space-y-2 p-3 rounded-xl border bg-card" data-testid={`manage-check-${check.id}`}>
                       <div className="flex items-center gap-2">
                         <div className="w-5 h-5 rounded-full shrink-0" style={{ backgroundColor: check.color }} />
                         <Input
@@ -503,18 +521,17 @@ export default function Home() {
                           }}
                           data-testid={`button-delete-check-${check.id}`}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
-                      <div className="flex gap-1.5 flex-wrap pl-7">
+                      <div className="flex gap-1 flex-wrap">
                         {PRESET_COLORS.map(c => (
                           <button
                             key={c}
-                            type="button"
-                            onClick={() => updateDailyCheck.mutate({ id: check.id, color: c })}
-                            className={`w-6 h-6 rounded-full border-2 transition-transform ${check.color === c ? "border-foreground scale-110" : "border-transparent"}`}
+                            className={`w-5 h-5 rounded-full transition-transform ${check.color === c ? "scale-125 ring-2 ring-offset-1 ring-primary" : "hover:scale-110"}`}
                             style={{ backgroundColor: c }}
-                            data-testid={`edit-color-${check.id}-${c}`}
+                            onClick={() => updateDailyCheck.mutate({ id: check.id, color: c })}
+                            data-testid={`color-swatch-${check.id}-${c}`}
                           />
                         ))}
                       </div>
@@ -524,11 +541,10 @@ export default function Home() {
               )}
             </div>
 
-            {/* Crea nuovo check */}
-            <div className="space-y-3 pt-4 border-t">
+            <div className="space-y-3 border-t pt-4">
               <h4 className="font-bold text-sm text-muted-foreground uppercase">Nuovo check</h4>
               <Input
-                placeholder="Nome (es. Mestruazioni, Yoga...)"
+                placeholder="Nome del check..."
                 value={newCheckName}
                 onChange={(e) => setNewCheckName(e.target.value)}
                 className="rounded-xl"
@@ -538,43 +554,41 @@ export default function Home() {
                 {PRESET_COLORS.map(c => (
                   <button
                     key={c}
-                    type="button"
-                    onClick={() => setNewCheckColor(c)}
-                    className={`w-8 h-8 rounded-full border-2 transition-transform ${newCheckColor === c ? "border-foreground scale-110" : "border-transparent"}`}
+                    className={`w-7 h-7 rounded-full transition-transform ${newCheckColor === c ? "scale-125 ring-2 ring-offset-1 ring-primary" : "hover:scale-110"}`}
                     style={{ backgroundColor: c }}
-                    data-testid={`color-${c}`}
+                    onClick={() => setNewCheckColor(c)}
+                    data-testid={`new-color-${c}`}
                   />
                 ))}
               </div>
               <div className="flex items-center gap-2">
-                <Checkbox
-                  id="track-days"
+                <input
+                  type="checkbox"
+                  id="trackDays"
                   checked={newCheckTrack}
-                  onCheckedChange={(v) => setNewCheckTrack(!!v)}
-                  data-testid="checkbox-track-days"
+                  onChange={(e) => setNewCheckTrack(e.target.checked)}
+                  className="rounded"
                 />
-                <label htmlFor="track-days" className="text-sm cursor-pointer">
-                  Mostra contatore giorni dall'ultimo check
-                </label>
+                <label htmlFor="trackDays" className="text-sm">Conta giorni dall'ultimo check</label>
               </div>
               <Button
-                className="w-full rounded-xl"
-                disabled={!newCheckName.trim() || createDailyCheck.isPending}
                 onClick={() => {
-                  createDailyCheck.mutate(
-                    { name: newCheckName.trim(), color: newCheckColor, trackDays: newCheckTrack },
-                    {
-                      onSuccess: () => {
-                        setNewCheckName("");
-                        setNewCheckColor("#10b981");
-                        setNewCheckTrack(false);
-                      },
-                    }
-                  );
+                  if (!newCheckName.trim()) return;
+                  createDailyCheck.mutate({
+                    name: newCheckName.trim(),
+                    color: newCheckColor,
+                    trackDays: newCheckTrack,
+                    order: (dailyChecks || []).length,
+                  });
+                  setNewCheckName("");
+                  setNewCheckColor("#10b981");
+                  setNewCheckTrack(false);
                 }}
+                disabled={!newCheckName.trim() || createDailyCheck.isPending}
+                className="w-full rounded-xl font-bold"
                 data-testid="button-create-check"
               >
-                <Plus className="w-4 h-4 mr-2" /> Aggiungi check
+                <Plus className="w-4 h-4 mr-2" /> Crea check
               </Button>
             </div>
           </div>
