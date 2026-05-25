@@ -161,6 +161,8 @@ export default function Home() {
   const [selectedCalDay, setSelectedCalDay] = useState<string | null>(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAddCheckOpen, setIsAddCheckOpen] = useState(false);
+  const [editingCheckId, setEditingCheckId] = useState<number | null>(null);
   const [isNameEditing, setIsNameEditing] = useState(false);
   const [newName, setNewName] = useState(user?.username || "Stefania");
 
@@ -253,8 +255,8 @@ export default function Home() {
             <Droplets className="w-5 h-5 text-accent" />
             Benessere Oggi
           </h2>
-          <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)}>
-            <Settings className="w-4 h-4 text-muted-foreground" />
+          <Button variant="ghost" size="icon" onClick={() => setIsAddCheckOpen(true)} data-testid="button-add-check-top">
+            <Plus className="w-5 h-5 text-muted-foreground" />
           </Button>
         </div>
 
@@ -265,36 +267,50 @@ export default function Home() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 text-[10px] text-primary font-bold"
+                className="h-6 text-[10px] text-muted-foreground"
                 onClick={() => setIsSettingsOpen(true)}
                 data-testid="button-manage-checks"
               >
-                <Plus className="w-3 h-3 mr-1" /> Gestisci
+                Gestisci lista
               </Button>
             </div>
             {(!dailyChecks || dailyChecks.length === 0) ? (
-              <p className="text-xs text-muted-foreground italic py-2">Nessun check creato. Tocca "Gestisci" per crearne uno.</p>
+              <p className="text-xs text-muted-foreground italic py-2">Nessun check. Tocca <strong>+</strong> per aggiungerne uno.</p>
             ) : (
               <div className="space-y-2">
-                {dailyChecks.map((check: any) => {
+                {[...(dailyChecks || [])].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0)).map((check: any) => {
                   const checked = isCheckedToday(check.id);
                   const daySince = check.trackDays ? daysSinceLastCheck(check.id) : null;
                   return (
-                    <div key={check.id} className="flex items-center justify-between gap-2" data-testid={`check-row-${check.id}`}>
+                    <div
+                      key={check.id}
+                      draggable
+                      onDragStart={() => handleDragStart(check.id)}
+                      onDragOver={(e) => handleDragOver(e, check.id)}
+                      onDrop={() => handleDrop(check.id)}
+                      onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                      className={`flex items-center justify-between gap-2 rounded-lg transition-all ${dragOverId === check.id && dragId !== check.id ? "bg-primary/10 scale-[1.01]" : ""}`}
+                      data-testid={`check-row-${check.id}`}
+                    >
+                      <GripVertical className="w-4 h-4 text-muted-foreground/30 cursor-grab shrink-0" />
                       <button
                         onClick={() => toggleCheckLog.mutate({ checkId: check.id, date: today, checked: !checked })}
-                        className="flex items-center gap-3 flex-1 min-w-0 group"
+                        className={`transition-all shrink-0 ${checked ? "scale-100" : "scale-90 opacity-60 hover:opacity-90"}`}
+                        data-testid={`button-toggle-check-${check.id}`}
                       >
-                        <div className={`transition-all ${checked ? "scale-100" : "scale-95 opacity-70 group-hover:opacity-100"}`}>
-                          <CheckDot color={check.color} dotStyle={check.dotStyle || "filled"} size="sm" checked={checked} />
-                        </div>
-                        <span className={`text-sm font-medium text-left ${checked ? "" : "text-muted-foreground"}`}>{check.name}</span>
+                        <CheckDot color={check.color} dotStyle={check.dotStyle || "filled"} size="sm" checked={checked} />
+                      </button>
+                      <button
+                        onClick={() => setEditingCheckId(check.id)}
+                        className="flex-1 text-left min-w-0"
+                        data-testid={`button-edit-check-name-${check.id}`}
+                      >
+                        <span className={`text-sm font-medium ${checked ? "" : "text-muted-foreground"}`}>{check.name}</span>
                       </button>
                       {check.trackDays && daySince !== null && (
                         <span
                           className="text-xs font-bold px-2 py-1 rounded-full shrink-0"
                           style={{ backgroundColor: `${check.color}20`, color: check.color }}
-                          title={daySince === 0 ? "Oggi" : `${daySince} ${daySince === 1 ? "giorno" : "giorni"} dall'ultimo check`}
                         >
                           {daySince === 0 ? "oggi" : `${daySince}g`}
                         </span>
@@ -758,6 +774,174 @@ export default function Home() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Dialogo "Aggiungi check" ── */}
+      <Dialog open={isAddCheckOpen} onOpenChange={setIsAddCheckOpen}>
+        <DialogContent className="sm:max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">Nuovo check</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Preview */}
+            <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
+              <CheckDot color={newCheckColor} dotStyle={newCheckStyle} size="md" checked={true} />
+              <span className="text-sm font-medium text-muted-foreground">{newCheckName || "Anteprima"}</span>
+            </div>
+            <Input
+              placeholder="Nome del check..."
+              value={newCheckName}
+              onChange={(e) => setNewCheckName(e.target.value)}
+              className="rounded-xl"
+              autoFocus
+              data-testid="input-new-check-name-quick"
+            />
+            {/* Shape selector */}
+            <div className="grid grid-cols-4 gap-2">
+              {([
+                { val: "filled" as const, label: "Cerchio" },
+                { val: "triangle" as const, label: "Triangolo" },
+                { val: "diamond" as const, label: "Rombo" },
+                { val: "heart" as const, label: "Cuore" },
+              ]).map(({ val, label }) => (
+                <button
+                  key={val}
+                  onClick={() => setNewCheckStyle(val)}
+                  className={`flex flex-col items-center gap-1.5 py-2 rounded-xl border text-[10px] font-bold transition-all ${newCheckStyle === val ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                >
+                  <CheckDot color={newCheckStyle === val ? newCheckColor : "#9ca3af"} dotStyle={val} size="sm" checked={true} />
+                  {label}
+                </button>
+              ))}
+            </div>
+            {/* Color palette */}
+            <div className="flex gap-1.5 flex-wrap">
+              {PRESET_COLORS.map(c => (
+                <button
+                  key={c}
+                  className={`w-7 h-7 rounded-full transition-transform ${newCheckColor === c ? "scale-125 ring-2 ring-offset-1 ring-gray-400" : "hover:scale-110"}`}
+                  style={{ backgroundColor: c }}
+                  onClick={() => setNewCheckColor(c)}
+                />
+              ))}
+              <label className="w-7 h-7 rounded-full border-2 border-dashed border-muted-foreground/50 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform" title="Colore personalizzato">
+                <span className="text-[10px] font-bold text-muted-foreground leading-none">+</span>
+                <input type="color" className="sr-only" value={newCheckColor} onChange={(e) => setNewCheckColor(e.target.value)} />
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="trackDaysQuick" checked={newCheckTrack} onChange={(e) => setNewCheckTrack(e.target.checked)} className="rounded" />
+              <label htmlFor="trackDaysQuick" className="text-sm">Conta giorni dall'ultimo check</label>
+            </div>
+            <Button
+              onClick={() => {
+                if (!newCheckName.trim()) return;
+                createDailyCheck.mutate({
+                  name: newCheckName.trim(),
+                  color: newCheckColor,
+                  dotStyle: newCheckStyle,
+                  trackDays: newCheckTrack,
+                  order: (dailyChecks || []).length,
+                });
+                setNewCheckName(""); setNewCheckColor("#10b981"); setNewCheckStyle("filled"); setNewCheckTrack(false);
+                setIsAddCheckOpen(false);
+              }}
+              disabled={!newCheckName.trim() || createDailyCheck.isPending}
+              className="w-full rounded-xl font-bold"
+            >
+              <Plus className="w-4 h-4 mr-2" /> Crea check
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialogo impostazioni singolo check ── */}
+      {editingCheckId !== null && (() => {
+        const check = (dailyChecks || []).find((c: any) => c.id === editingCheckId);
+        if (!check) return null;
+        return (
+          <Dialog open={true} onOpenChange={() => setEditingCheckId(null)}>
+            <DialogContent className="sm:max-w-sm rounded-3xl">
+              <DialogHeader>
+                <DialogTitle className="font-display text-xl flex items-center gap-3">
+                  <CheckDot color={check.color} dotStyle={check.dotStyle || "filled"} size="md" checked={true} />
+                  {check.name}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                {/* Name */}
+                <Input
+                  defaultValue={check.name}
+                  className="rounded-xl"
+                  onBlur={(e) => { if (e.target.value && e.target.value !== check.name) updateDailyCheck.mutate({ id: check.id, name: e.target.value }); }}
+                  data-testid={`input-edit-check-name-${check.id}`}
+                />
+                {/* Shape */}
+                <div className="grid grid-cols-4 gap-2">
+                  {([
+                    { val: "filled", label: "Cerchio" },
+                    { val: "triangle", label: "Triangolo" },
+                    { val: "diamond", label: "Rombo" },
+                    { val: "heart", label: "Cuore" },
+                  ]).map(({ val, label }) => {
+                    const active = (check.dotStyle || "filled") === val;
+                    return (
+                      <button
+                        key={val}
+                        onClick={() => updateDailyCheck.mutate({ id: check.id, dotStyle: val })}
+                        className={`flex flex-col items-center gap-1.5 py-2 rounded-xl border text-[10px] font-bold transition-all ${active ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                      >
+                        <CheckDot color={active ? check.color : "#9ca3af"} dotStyle={val} size="sm" checked={true} />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Color palette */}
+                <div className="flex gap-1.5 flex-wrap">
+                  {PRESET_COLORS.map(c => (
+                    <button
+                      key={c}
+                      className={`w-7 h-7 rounded-full transition-transform ${check.color === c ? "scale-125 ring-2 ring-offset-1 ring-gray-400" : "hover:scale-110"}`}
+                      style={{ backgroundColor: c }}
+                      onClick={() => updateDailyCheck.mutate({ id: check.id, color: c })}
+                    />
+                  ))}
+                  <label className="w-7 h-7 rounded-full border-2 border-dashed border-muted-foreground/50 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform">
+                    <span className="text-[10px] font-bold text-muted-foreground leading-none">+</span>
+                    <input type="color" className="sr-only" value={check.color} onChange={(e) => updateDailyCheck.mutate({ id: check.id, color: e.target.value })} />
+                  </label>
+                </div>
+                {/* Track days + delete */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id={`trackEdit-${check.id}`}
+                      checked={!!check.trackDays}
+                      onChange={(e) => updateDailyCheck.mutate({ id: check.id, trackDays: e.target.checked })}
+                      className="rounded"
+                    />
+                    <label htmlFor={`trackEdit-${check.id}`} className="text-sm">Conta giorni</label>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      if (confirm(`Eliminare "${check.name}"?`)) {
+                        deleteDailyCheck.mutate(check.id);
+                        setEditingCheckId(null);
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" /> Elimina
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
