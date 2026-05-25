@@ -84,20 +84,19 @@ export default function Home() {
     const fill = checked ? color : "none";
 
     if (dotStyle === "triangle") {
-      // Dog paw: big central pad + 4 round toes above
-      const sw2 = sw;
+      // Dog paw print — viewBox 0 0 24 24, all shapes well within bounds
       return (
         <svg width={s} height={s} viewBox="0 0 24 24" className="shrink-0">
-          {/* main pad */}
-          <ellipse cx="12" cy="16.5" rx="5.5" ry="4.2" fill={fill} stroke={color} strokeWidth={sw2} />
-          {/* toe far-left */}
-          <circle cx="5.5" cy="11" r="2" fill={fill} stroke={color} strokeWidth={sw2} />
-          {/* toe center-left */}
-          <circle cx="9.5" cy="8.5" r="2.2" fill={fill} stroke={color} strokeWidth={sw2} />
-          {/* toe center-right */}
-          <circle cx="14.5" cy="8.5" r="2.2" fill={fill} stroke={color} strokeWidth={sw2} />
-          {/* toe far-right */}
-          <circle cx="18.5" cy="11" r="2" fill={fill} stroke={color} strokeWidth={sw2} />
+          {/* central heel pad */}
+          <ellipse cx="12" cy="18.5" rx="5.5" ry="3.8" fill={fill} stroke={color} strokeWidth={sw} />
+          {/* inner-left toe */}
+          <circle cx="8.5" cy="9.5" r="2.5" fill={fill} stroke={color} strokeWidth={sw} />
+          {/* inner-right toe */}
+          <circle cx="15.5" cy="9.5" r="2.5" fill={fill} stroke={color} strokeWidth={sw} />
+          {/* outer-left toe */}
+          <circle cx="4.2" cy="14" r="2" fill={fill} stroke={color} strokeWidth={sw} />
+          {/* outer-right toe */}
+          <circle cx="19.8" cy="14" r="2" fill={fill} stroke={color} strokeWidth={sw} />
         </svg>
       );
     }
@@ -135,8 +134,8 @@ export default function Home() {
   // Mini dot for the calendar — always filled
   const CalDot = ({ color, dotStyle }: { color: string; dotStyle: string }) => {
     const s = 7; const h = s / 2; const p = 0.4;
-    if (dotStyle === "triangle") // paw — simplified as filled circle for mini size
-      return <svg width={s} height={s} viewBox="0 0 24 24"><ellipse cx="12" cy="16.5" rx="5" ry="3.8" fill={color} /><ellipse cx="7" cy="10.5" rx="2.1" ry="2.6" transform="rotate(-20,7,10.5)" fill={color} /><ellipse cx="17" cy="10.5" rx="2.1" ry="2.6" transform="rotate(20,17,10.5)" fill={color} /><ellipse cx="4.5" cy="14" rx="1.8" ry="2.3" transform="rotate(-35,4.5,14)" fill={color} /><ellipse cx="19.5" cy="14" rx="1.8" ry="2.3" transform="rotate(35,19.5,14)" fill={color} /></svg>;
+    if (dotStyle === "triangle") // paw
+      return <svg width={s} height={s} viewBox="0 0 24 24"><ellipse cx="12" cy="18.5" rx="5.5" ry="3.8" fill={color} /><circle cx="8.5" cy="9.5" r="2.5" fill={color} /><circle cx="15.5" cy="9.5" r="2.5" fill={color} /><circle cx="4.2" cy="14" r="2" fill={color} /><circle cx="19.8" cy="14" r="2" fill={color} /></svg>;
     if (dotStyle === "diamond") // star sparkle
       return <svg width={s} height={s} viewBox="0 0 24 24"><path d="M12,1.5 Q13.2,10.8 22.5,12 Q13.2,13.2 12,22.5 Q10.8,13.2 1.5,12 Q10.8,10.8 12,1.5 Z" fill={color} /></svg>;
     if (dotStyle === "heart")
