@@ -84,11 +84,11 @@ export default function Home() {
     const fill = checked ? color : "none";
 
     if (dotStyle === "triangle") {
-      // Bone — single compound bezier path: 2 knobs on each end, narrow bar in middle
+      // Rounded square
       return (
         <svg width={s} height={s} viewBox="0 0 24 24" className="shrink-0">
-          <path d="M3.5,12 C3.5,8 5,6 7,6 C9,6 10,8 9.5,10 L14.5,10 C14,8 15,6 17,6 C19,6 20.5,8 20.5,12 C20.5,16 19,18 17,18 C15,18 14,16 14.5,14 L9.5,14 C10,16 9,18 7,18 C5,18 3.5,16 3.5,12 Z"
-            fill={fill} stroke={color} strokeWidth={sw} strokeLinejoin="round" strokeLinecap="round" />
+          <rect x="3" y="3" width="18" height="18" rx="4" ry="4"
+            fill={fill} stroke={color} strokeWidth={sw} />
         </svg>
       );
     }
@@ -126,8 +126,8 @@ export default function Home() {
   // Mini dot for the calendar — always filled
   const CalDot = ({ color, dotStyle }: { color: string; dotStyle: string }) => {
     const s = 7; const h = s / 2; const p = 0.4;
-    if (dotStyle === "triangle") // bone
-      return <svg width={s} height={s} viewBox="0 0 24 24"><path d="M3.5,12 C3.5,8 5,6 7,6 C9,6 10,8 9.5,10 L14.5,10 C14,8 15,6 17,6 C19,6 20.5,8 20.5,12 C20.5,16 19,18 17,18 C15,18 14,16 14.5,14 L9.5,14 C10,16 9,18 7,18 C5,18 3.5,16 3.5,12 Z" fill={color} /></svg>;
+    if (dotStyle === "triangle") // square
+      return <svg width={s} height={s} viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" ry="4" fill={color} /></svg>;
     if (dotStyle === "diamond") // star sparkle
       return <svg width={s} height={s} viewBox="0 0 24 24"><path d="M12,1.5 Q13.2,10.8 22.5,12 Q13.2,13.2 12,22.5 Q10.8,13.2 1.5,12 Q10.8,10.8 12,1.5 Z" fill={color} /></svg>;
     if (dotStyle === "heart")
