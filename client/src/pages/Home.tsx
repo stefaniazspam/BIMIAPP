@@ -84,22 +84,20 @@ export default function Home() {
     const fill = checked ? color : "none";
 
     if (dotStyle === "triangle") {
-      // Dog paw print
-      const sc = s / 24;
+      // Dog paw: big central pad + 4 round toes above
+      const sw2 = sw;
       return (
-        <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} className="shrink-0">
-          <g transform={`scale(${sc})`}>
-            {/* main pad */}
-            <ellipse cx="12" cy="16.5" rx="5" ry="3.8" fill={fill} stroke={color} strokeWidth={sw / sc} />
-            {/* top-left toe */}
-            <ellipse cx="7" cy="10.5" rx="2.1" ry="2.6" transform="rotate(-20,7,10.5)" fill={fill} stroke={color} strokeWidth={sw / sc} />
-            {/* top-right toe */}
-            <ellipse cx="17" cy="10.5" rx="2.1" ry="2.6" transform="rotate(20,17,10.5)" fill={fill} stroke={color} strokeWidth={sw / sc} />
-            {/* mid-left toe */}
-            <ellipse cx="4.5" cy="14" rx="1.8" ry="2.3" transform="rotate(-35,4.5,14)" fill={fill} stroke={color} strokeWidth={sw / sc} />
-            {/* mid-right toe */}
-            <ellipse cx="19.5" cy="14" rx="1.8" ry="2.3" transform="rotate(35,19.5,14)" fill={fill} stroke={color} strokeWidth={sw / sc} />
-          </g>
+        <svg width={s} height={s} viewBox="0 0 24 24" className="shrink-0">
+          {/* main pad */}
+          <ellipse cx="12" cy="16.5" rx="5.5" ry="4.2" fill={fill} stroke={color} strokeWidth={sw2} />
+          {/* toe far-left */}
+          <circle cx="5.5" cy="11" r="2" fill={fill} stroke={color} strokeWidth={sw2} />
+          {/* toe center-left */}
+          <circle cx="9.5" cy="8.5" r="2.2" fill={fill} stroke={color} strokeWidth={sw2} />
+          {/* toe center-right */}
+          <circle cx="14.5" cy="8.5" r="2.2" fill={fill} stroke={color} strokeWidth={sw2} />
+          {/* toe far-right */}
+          <circle cx="18.5" cy="11" r="2" fill={fill} stroke={color} strokeWidth={sw2} />
         </svg>
       );
     }
@@ -643,16 +641,15 @@ export default function Home() {
                           { val: "triangle", label: "Zampa" },
                           { val: "diamond", label: "Stella" },
                           { val: "heart", label: "Cuore" },
-                        ].map(({ val, label }) => {
+                        ].map(({ val }) => {
                           const active = (check.dotStyle || "filled") === val;
                           return (
                             <button
                               key={val}
                               onClick={() => updateDailyCheck.mutate({ id: check.id, dotStyle: val })}
-                              className={`flex flex-col items-center gap-1 py-1.5 rounded-lg border text-[10px] font-bold transition-all ${active ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                              className={`flex items-center justify-center py-2 rounded-lg border transition-all ${active ? "border-primary bg-primary/10" : "border-muted hover:border-muted-foreground"}`}
                             >
                               <CheckDot color={active ? check.color : "#9ca3af"} dotStyle={val} size="sm" checked={true} />
-                              {label}
                             </button>
                           );
                         })}
@@ -712,15 +709,14 @@ export default function Home() {
                   { val: "triangle" as const, label: "Zampa" },
                   { val: "diamond" as const, label: "Stella" },
                   { val: "heart" as const, label: "Cuore" },
-                ].map(({ val, label }) => (
+                ].map(({ val }) => (
                   <button
                     key={val}
                     onClick={() => setNewCheckStyle(val)}
-                    className={`flex flex-col items-center gap-1.5 py-2 rounded-xl border text-[10px] font-bold transition-all ${newCheckStyle === val ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                    className={`flex items-center justify-center py-2.5 rounded-xl border transition-all ${newCheckStyle === val ? "border-primary bg-primary/10" : "border-muted hover:border-muted-foreground"}`}
                     data-testid={`style-${val}`}
                   >
                     <CheckDot color={newCheckStyle === val ? newCheckColor : "#9ca3af"} dotStyle={val} size="sm" checked={true} />
-                    {label}
                   </button>
                 ))}
               </div>
@@ -818,14 +814,13 @@ export default function Home() {
                 { val: "triangle" as const, label: "Zampa" },
                 { val: "diamond" as const, label: "Stella" },
                 { val: "heart" as const, label: "Cuore" },
-              ]).map(({ val, label }) => (
+              ]).map(({ val }) => (
                 <button
                   key={val}
                   onClick={() => setNewCheckStyle(val)}
-                  className={`flex flex-col items-center gap-1.5 py-2 rounded-xl border text-[10px] font-bold transition-all ${newCheckStyle === val ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                  className={`flex items-center justify-center py-2.5 rounded-xl border transition-all ${newCheckStyle === val ? "border-primary bg-primary/10" : "border-muted hover:border-muted-foreground"}`}
                 >
                   <CheckDot color={newCheckStyle === val ? newCheckColor : "#9ca3af"} dotStyle={val} size="sm" checked={true} />
-                  {label}
                 </button>
               ))}
             </div>
@@ -898,16 +893,15 @@ export default function Home() {
                     { val: "triangle", label: "Zampa" },
                     { val: "diamond", label: "Stella" },
                     { val: "heart", label: "Cuore" },
-                  ]).map(({ val, label }) => {
+                  ]).map(({ val }) => {
                     const active = (check.dotStyle || "filled") === val;
                     return (
                       <button
                         key={val}
                         onClick={() => updateDailyCheck.mutate({ id: check.id, dotStyle: val })}
-                        className={`flex flex-col items-center gap-1.5 py-2 rounded-xl border text-[10px] font-bold transition-all ${active ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                        className={`flex items-center justify-center py-2.5 rounded-xl border transition-all ${active ? "border-primary bg-primary/10" : "border-muted hover:border-muted-foreground"}`}
                       >
                         <CheckDot color={active ? check.color : "#9ca3af"} dotStyle={val} size="sm" checked={true} />
-                        {label}
                       </button>
                     );
                   })}
