@@ -63,9 +63,52 @@ export default function Home() {
 
   const [newCheckName, setNewCheckName] = useState("");
   const [newCheckColor, setNewCheckColor] = useState("#10b981");
+  const [newCheckStyle, setNewCheckStyle] = useState<"filled" | "outline">("filled");
   const [newCheckTrack, setNewCheckTrack] = useState(false);
 
-  const PRESET_COLORS = ["#ef4444", "#f97316", "#eab308", "#10b981", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899"];
+  const PRESET_COLORS = [
+    // Rossi/Arancioni
+    "#ef4444", "#dc2626", "#f97316", "#ea580c", "#fb923c",
+    // Gialli/Verdi lime
+    "#eab308", "#ca8a04", "#84cc16", "#65a30d",
+    // Verdi
+    "#22c55e", "#16a34a", "#10b981", "#059669",
+    // Ciano/Azzurri
+    "#06b6d4", "#0891b2", "#38bdf8", "#0284c7",
+    // Blu/Indigo
+    "#3b82f6", "#2563eb", "#6366f1", "#4f46e5",
+    // Viola/Rosa
+    "#8b5cf6", "#7c3aed", "#a855f7", "#ec4899", "#db2777",
+    // Toni neutri/caldi
+    "#f43f5e", "#e11d48", "#78716c", "#57534e",
+  ];
+
+  // Renders the colored indicator dot respecting dotStyle
+  const CheckDot = ({ color, dotStyle, size = "sm", checked }: {
+    color: string; dotStyle: string; size?: "sm" | "md" | "lg"; checked: boolean;
+  }) => {
+    const sizeClass = size === "sm" ? "w-6 h-6" : size === "md" ? "w-7 h-7" : "w-8 h-8";
+    const iconClass = size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4";
+    const isFilled = dotStyle !== "outline";
+    return (
+      <div
+        className={`${sizeClass} rounded-full border-2 shrink-0 flex items-center justify-center transition-all`}
+        style={{
+          borderColor: color,
+          backgroundColor: isFilled && checked ? color : "transparent",
+          borderWidth: !isFilled && checked ? "3px" : "2px",
+        }}
+      >
+        {checked && (
+          <Check
+            className={iconClass}
+            strokeWidth={3}
+            style={{ color: isFilled ? "white" : color }}
+          />
+        )}
+      </div>
+    );
+  };
 
   const queryClient = useQueryClient();
   const updateReminder = useMutation({
@@ -200,28 +243,25 @@ export default function Home() {
               <div className="space-y-2">
                 {dailyChecks.map((check: any) => {
                   const checked = isCheckedToday(check.id);
-                  const days = check.trackDays ? daysSinceLastCheck(check.id) : null;
+                  const daySince = check.trackDays ? daysSinceLastCheck(check.id) : null;
                   return (
                     <div key={check.id} className="flex items-center justify-between gap-2" data-testid={`check-row-${check.id}`}>
                       <button
                         onClick={() => toggleCheckLog.mutate({ checkId: check.id, date: today, checked: !checked })}
                         className="flex items-center gap-3 flex-1 min-w-0 group"
                       >
-                        <div
-                          className={`w-6 h-6 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${checked ? "scale-100" : "scale-95 opacity-70 group-hover:opacity-100"}`}
-                          style={{ borderColor: check.color, backgroundColor: checked ? check.color : "transparent" }}
-                        >
-                          {checked && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+                        <div className={`transition-all ${checked ? "scale-100" : "scale-95 opacity-70 group-hover:opacity-100"}`}>
+                          <CheckDot color={check.color} dotStyle={check.dotStyle || "filled"} size="sm" checked={checked} />
                         </div>
                         <span className={`text-sm font-medium text-left ${checked ? "" : "text-muted-foreground"}`}>{check.name}</span>
                       </button>
-                      {check.trackDays && days !== null && (
+                      {check.trackDays && daySince !== null && (
                         <span
                           className="text-xs font-bold px-2 py-1 rounded-full shrink-0"
                           style={{ backgroundColor: `${check.color}20`, color: check.color }}
-                          title={days === 0 ? "Oggi" : `${days} ${days === 1 ? "giorno" : "giorni"} dall'ultimo check`}
+                          title={daySince === 0 ? "Oggi" : `${daySince} ${daySince === 1 ? "giorno" : "giorni"} dall'ultimo check`}
                         >
-                          {days === 0 ? "oggi" : `${days}g`}
+                          {daySince === 0 ? "oggi" : `${daySince}g`}
                         </span>
                       )}
                     </div>
@@ -404,10 +444,9 @@ export default function Home() {
                 const checkIdsForDay = new Set(
                   (dailyCheckLogs || []).filter((l: any) => l.date === dateStr).map((l: any) => l.checkId)
                 );
-                const dotColors = (dailyChecks || [])
+                const checksForDay = (dailyChecks || [])
                   .filter((c: any) => checkIdsForDay.has(c.id))
-                  .map((c: any) => c.color)
-                  .slice(0, 4);
+                  .slice(0, 5);
                 const isSelected = dateStr === today;
 
                 return (
@@ -418,8 +457,10 @@ export default function Home() {
                   >
                     <span className={`text-sm font-medium ${isSelected ? "text-primary font-bold" : ""}`}>{format(day, "d")}</span>
                     <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center max-w-full">
-                      {dotColors.map((color: string, idx: number) => (
-                        <div key={idx} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                      {checksForDay.map((check: any, idx: number) => (
+                        check.dotStyle === "outline"
+                          ? <div key={idx} className="w-1.5 h-1.5 rounded-full border" style={{ borderColor: check.color, borderWidth: "1.5px" }} />
+                          : <div key={idx} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: check.color }} />
                       ))}
                     </div>
                   </button>
@@ -456,12 +497,7 @@ export default function Home() {
                     style={{ borderColor: checked ? check.color : undefined }}
                     data-testid={`day-check-toggle-${check.id}`}
                   >
-                    <div
-                      className="w-7 h-7 rounded-full border-2 shrink-0 flex items-center justify-center transition-all"
-                      style={{ borderColor: check.color, backgroundColor: checked ? check.color : "transparent" }}
-                    >
-                      {checked && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
-                    </div>
+                    <CheckDot color={check.color} dotStyle={check.dotStyle || "filled"} size="md" checked={checked} />
                     <span className={`text-sm font-medium flex-1 text-left ${checked ? "font-bold" : "text-muted-foreground"}`}>{check.name}</span>
                     <span className="text-xs font-bold" style={{ color: checked ? check.color : "#aaa" }}>
                       {checked ? "Fatto" : "Non fatto"}
@@ -488,9 +524,10 @@ export default function Home() {
               ) : (
                 <div className="space-y-2">
                   {dailyChecks.map((check: any) => (
-                    <div key={check.id} className="space-y-2 p-3 rounded-xl border bg-card" data-testid={`manage-check-${check.id}`}>
+                    <div key={check.id} className="space-y-3 p-3 rounded-xl border bg-card" data-testid={`manage-check-${check.id}`}>
+                      {/* Row 1: preview dot + name input + giorni + delete */}
                       <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full shrink-0" style={{ backgroundColor: check.color }} />
+                        <CheckDot color={check.color} dotStyle={check.dotStyle || "filled"} size="sm" checked={true} />
                         <Input
                           defaultValue={check.name}
                           className="rounded-lg h-8 flex-1"
@@ -504,7 +541,7 @@ export default function Home() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className={`h-8 px-2 text-[10px] ${check.trackDays ? "text-primary font-bold" : "text-muted-foreground"}`}
+                          className={`h-8 px-2 text-[10px] shrink-0 ${check.trackDays ? "text-primary font-bold" : "text-muted-foreground"}`}
                           onClick={() => updateDailyCheck.mutate({ id: check.id, trackDays: !check.trackDays })}
                           title="Conta giorni dall'ultimo check"
                         >
@@ -524,16 +561,47 @@ export default function Home() {
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
+                      {/* Row 2: style toggle */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => updateDailyCheck.mutate({ id: check.id, dotStyle: "filled" })}
+                          className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg border text-xs font-bold transition-all ${(check.dotStyle || "filled") === "filled" ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                        >
+                          <div className="w-4 h-4 rounded-full" style={{ backgroundColor: check.color }} />
+                          Pieno
+                        </button>
+                        <button
+                          onClick={() => updateDailyCheck.mutate({ id: check.id, dotStyle: "outline" })}
+                          className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg border text-xs font-bold transition-all ${check.dotStyle === "outline" ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                        >
+                          <div className="w-4 h-4 rounded-full border-2" style={{ borderColor: check.color }} />
+                          Solo bordo
+                        </button>
+                      </div>
+                      {/* Row 3: color palette grid */}
                       <div className="flex gap-1 flex-wrap">
                         {PRESET_COLORS.map(c => (
                           <button
                             key={c}
-                            className={`w-5 h-5 rounded-full transition-transform ${check.color === c ? "scale-125 ring-2 ring-offset-1 ring-primary" : "hover:scale-110"}`}
+                            className={`w-5 h-5 rounded-full transition-transform ${check.color === c ? "scale-125 ring-2 ring-offset-1 ring-gray-400" : "hover:scale-110"}`}
                             style={{ backgroundColor: c }}
                             onClick={() => updateDailyCheck.mutate({ id: check.id, color: c })}
                             data-testid={`color-swatch-${check.id}-${c}`}
                           />
                         ))}
+                        {/* Custom color picker */}
+                        <label
+                          className="w-5 h-5 rounded-full border-2 border-dashed border-muted-foreground/50 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                          title="Colore personalizzato"
+                        >
+                          <span className="text-[8px] font-bold text-muted-foreground">+</span>
+                          <input
+                            type="color"
+                            className="sr-only"
+                            value={check.color}
+                            onChange={(e) => updateDailyCheck.mutate({ id: check.id, color: e.target.value })}
+                          />
+                        </label>
                       </div>
                     </div>
                   ))}
@@ -543,6 +611,13 @@ export default function Home() {
 
             <div className="space-y-3 border-t pt-4">
               <h4 className="font-bold text-sm text-muted-foreground uppercase">Nuovo check</h4>
+
+              {/* Preview */}
+              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
+                <CheckDot color={newCheckColor} dotStyle={newCheckStyle} size="md" checked={true} />
+                <span className="text-sm font-medium text-muted-foreground">{newCheckName || "Anteprima"}</span>
+              </div>
+
               <Input
                 placeholder="Nome del check..."
                 value={newCheckName}
@@ -550,17 +625,56 @@ export default function Home() {
                 className="rounded-xl"
                 data-testid="input-new-check-name"
               />
-              <div className="flex gap-2 flex-wrap">
-                {PRESET_COLORS.map(c => (
-                  <button
-                    key={c}
-                    className={`w-7 h-7 rounded-full transition-transform ${newCheckColor === c ? "scale-125 ring-2 ring-offset-1 ring-primary" : "hover:scale-110"}`}
-                    style={{ backgroundColor: c }}
-                    onClick={() => setNewCheckColor(c)}
-                    data-testid={`new-color-${c}`}
-                  />
-                ))}
+
+              {/* Style toggle */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setNewCheckStyle("filled")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-xs font-bold transition-all ${newCheckStyle === "filled" ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                  data-testid="style-filled"
+                >
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: newCheckColor }} />
+                  Pieno
+                </button>
+                <button
+                  onClick={() => setNewCheckStyle("outline")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-xs font-bold transition-all ${newCheckStyle === "outline" ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                  data-testid="style-outline"
+                >
+                  <div className="w-4 h-4 rounded-full border-2" style={{ borderColor: newCheckColor }} />
+                  Solo bordo
+                </button>
               </div>
+
+              {/* Color palette */}
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5">Colore</p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {PRESET_COLORS.map(c => (
+                    <button
+                      key={c}
+                      className={`w-6 h-6 rounded-full transition-transform ${newCheckColor === c ? "scale-125 ring-2 ring-offset-1 ring-gray-400" : "hover:scale-110"}`}
+                      style={{ backgroundColor: c }}
+                      onClick={() => setNewCheckColor(c)}
+                      data-testid={`new-color-${c}`}
+                    />
+                  ))}
+                  {/* Custom color picker */}
+                  <label
+                    className="w-6 h-6 rounded-full border-2 border-dashed border-muted-foreground/50 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                    title="Colore personalizzato"
+                  >
+                    <span className="text-[9px] font-bold text-muted-foreground leading-none">+</span>
+                    <input
+                      type="color"
+                      className="sr-only"
+                      value={newCheckColor}
+                      onChange={(e) => setNewCheckColor(e.target.value)}
+                    />
+                  </label>
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -571,17 +685,20 @@ export default function Home() {
                 />
                 <label htmlFor="trackDays" className="text-sm">Conta giorni dall'ultimo check</label>
               </div>
+
               <Button
                 onClick={() => {
                   if (!newCheckName.trim()) return;
                   createDailyCheck.mutate({
                     name: newCheckName.trim(),
                     color: newCheckColor,
+                    dotStyle: newCheckStyle,
                     trackDays: newCheckTrack,
                     order: (dailyChecks || []).length,
                   });
                   setNewCheckName("");
                   setNewCheckColor("#10b981");
+                  setNewCheckStyle("filled");
                   setNewCheckTrack(false);
                 }}
                 disabled={!newCheckName.trim() || createDailyCheck.isPending}

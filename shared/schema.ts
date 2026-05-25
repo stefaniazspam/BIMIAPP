@@ -93,6 +93,7 @@ export const dailyChecks = pgTable("daily_checks", {
   userId: integer("user_id").notNull(),
   name: text("name").notNull(),
   color: text("color").notNull().default("#10b981"), // hex color for the calendar dot
+  dotStyle: text("dot_style").notNull().default("filled"), // "filled" | "outline"
   trackDays: boolean("track_days").default(false), // if true, show counter of days since last check (e.g., for period)
   order: integer("order").notNull().default(0),
 });
