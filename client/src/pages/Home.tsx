@@ -63,7 +63,7 @@ export default function Home() {
 
   const [newCheckName, setNewCheckName] = useState("");
   const [newCheckColor, setNewCheckColor] = useState("#10b981");
-  const [newCheckStyle, setNewCheckStyle] = useState<"filled" | "outline">("filled");
+  const [newCheckStyle, setNewCheckStyle] = useState<"filled" | "outline" | "triangle" | "diamond">("filled");
   const [newCheckTrack, setNewCheckTrack] = useState(false);
 
   const PRESET_COLORS = [
@@ -83,31 +83,68 @@ export default function Home() {
     "#f43f5e", "#e11d48", "#78716c", "#57534e",
   ];
 
-  // Renders the colored indicator dot respecting dotStyle
+  // SVG-based shape renderer — supports circle filled, circle outline, triangle, diamond
   const CheckDot = ({ color, dotStyle, size = "sm", checked }: {
     color: string; dotStyle: string; size?: "sm" | "md" | "lg"; checked: boolean;
   }) => {
-    const sizeClass = size === "sm" ? "w-6 h-6" : size === "md" ? "w-7 h-7" : "w-8 h-8";
-    const iconClass = size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4";
-    const isFilled = dotStyle !== "outline";
+    const s = size === "sm" ? 24 : size === "md" ? 28 : 32;
+    const sw = 2;
+    const pad = sw + 1;
+    const half = s / 2;
+    // Checkmark path scaled to the SVG viewBox
+    const ck = `M${s*0.22},${s*0.52} L${s*0.42},${s*0.72} L${s*0.78},${s*0.28}`;
+    const ckColor = (dotStyle === "outline") ? color : "white";
+
+    let shape: React.ReactNode;
+    if (dotStyle === "outline") {
+      shape = (
+        <circle cx={half} cy={half} r={half - sw}
+          fill="none" stroke={color} strokeWidth={checked ? 3 : sw} />
+      );
+    } else if (dotStyle === "triangle") {
+      shape = (
+        <polygon points={`${half},${pad} ${pad},${s - pad} ${s - pad},${s - pad}`}
+          fill={checked ? color : "none"} stroke={color} strokeWidth={sw} />
+      );
+    } else if (dotStyle === "diamond") {
+      shape = (
+        <polygon points={`${half},${pad} ${s - pad},${half} ${half},${s - pad} ${pad},${half}`}
+          fill={checked ? color : "none"} stroke={color} strokeWidth={sw} />
+      );
+    } else {
+      // default: "filled" circle
+      shape = (
+        <circle cx={half} cy={half} r={half - sw}
+          fill={checked ? color : "none"} stroke={color} strokeWidth={sw} />
+      );
+    }
+
     return (
-      <div
-        className={`${sizeClass} rounded-full border-2 shrink-0 flex items-center justify-center transition-all`}
-        style={{
-          borderColor: color,
-          backgroundColor: isFilled && checked ? color : "transparent",
-          borderWidth: !isFilled && checked ? "3px" : "2px",
-        }}
-      >
+      <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} className="shrink-0">
+        {shape}
         {checked && (
-          <Check
-            className={iconClass}
-            strokeWidth={3}
-            style={{ color: isFilled ? "white" : color }}
-          />
+          <path d={ck} fill="none" stroke={ckColor} strokeWidth={2.5}
+            strokeLinecap="round" strokeLinejoin="round" />
         )}
-      </div>
+      </svg>
     );
+  };
+
+  // Mini dot for the calendar (6×6 SVG)
+  const CalDot = ({ color, dotStyle }: { color: string; dotStyle: string }) => {
+    const s = 6;
+    const half = 3;
+    const pad = 0.5;
+    if (dotStyle === "outline") {
+      return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><circle cx={half} cy={half} r={half - pad} fill="none" stroke={color} strokeWidth={1} /></svg>;
+    }
+    if (dotStyle === "triangle") {
+      return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><polygon points={`${half},${pad} ${pad},${s-pad} ${s-pad},${s-pad}`} fill={color} /></svg>;
+    }
+    if (dotStyle === "diamond") {
+      return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><polygon points={`${half},${pad} ${s-pad},${half} ${half},${s-pad} ${pad},${half}`} fill={color} /></svg>;
+    }
+    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><circle cx={half} cy={half} r={half - pad} fill={color} /></svg>;
   };
 
   const queryClient = useQueryClient();
@@ -458,9 +495,7 @@ export default function Home() {
                     <span className={`text-sm font-medium ${isSelected ? "text-primary font-bold" : ""}`}>{format(day, "d")}</span>
                     <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center max-w-full">
                       {checksForDay.map((check: any, idx: number) => (
-                        check.dotStyle === "outline"
-                          ? <div key={idx} className="w-1.5 h-1.5 rounded-full border" style={{ borderColor: check.color, borderWidth: "1.5px" }} />
-                          : <div key={idx} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: check.color }} />
+                        <CalDot key={idx} color={check.color} dotStyle={check.dotStyle || "filled"} />
                       ))}
                     </div>
                   </button>
@@ -561,22 +596,26 @@ export default function Home() {
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
-                      {/* Row 2: style toggle */}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => updateDailyCheck.mutate({ id: check.id, dotStyle: "filled" })}
-                          className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg border text-xs font-bold transition-all ${(check.dotStyle || "filled") === "filled" ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
-                        >
-                          <div className="w-4 h-4 rounded-full" style={{ backgroundColor: check.color }} />
-                          Pieno
-                        </button>
-                        <button
-                          onClick={() => updateDailyCheck.mutate({ id: check.id, dotStyle: "outline" })}
-                          className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg border text-xs font-bold transition-all ${check.dotStyle === "outline" ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
-                        >
-                          <div className="w-4 h-4 rounded-full border-2" style={{ borderColor: check.color }} />
-                          Solo bordo
-                        </button>
+                      {/* Row 2: shape selector 2×2 grid */}
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[
+                          { val: "filled", label: "Cerchio" },
+                          { val: "outline", label: "Bordo" },
+                          { val: "triangle", label: "Triangolo" },
+                          { val: "diamond", label: "Rombo" },
+                        ].map(({ val, label }) => {
+                          const active = (check.dotStyle || "filled") === val;
+                          return (
+                            <button
+                              key={val}
+                              onClick={() => updateDailyCheck.mutate({ id: check.id, dotStyle: val })}
+                              className={`flex flex-col items-center gap-1 py-1.5 rounded-lg border text-[10px] font-bold transition-all ${active ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                            >
+                              <CheckDot color={check.color} dotStyle={val} size="sm" checked={true} />
+                              {label}
+                            </button>
+                          );
+                        })}
                       </div>
                       {/* Row 3: color palette grid */}
                       <div className="flex gap-1 flex-wrap">
@@ -626,24 +665,24 @@ export default function Home() {
                 data-testid="input-new-check-name"
               />
 
-              {/* Style toggle */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setNewCheckStyle("filled")}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-xs font-bold transition-all ${newCheckStyle === "filled" ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
-                  data-testid="style-filled"
-                >
-                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: newCheckColor }} />
-                  Pieno
-                </button>
-                <button
-                  onClick={() => setNewCheckStyle("outline")}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border text-xs font-bold transition-all ${newCheckStyle === "outline" ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
-                  data-testid="style-outline"
-                >
-                  <div className="w-4 h-4 rounded-full border-2" style={{ borderColor: newCheckColor }} />
-                  Solo bordo
-                </button>
+              {/* Shape selector */}
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { val: "filled" as const, label: "Cerchio" },
+                  { val: "outline" as const, label: "Bordo" },
+                  { val: "triangle" as const, label: "Triangolo" },
+                  { val: "diamond" as const, label: "Rombo" },
+                ].map(({ val, label }) => (
+                  <button
+                    key={val}
+                    onClick={() => setNewCheckStyle(val)}
+                    className={`flex flex-col items-center gap-1.5 py-2 rounded-xl border text-[10px] font-bold transition-all ${newCheckStyle === val ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
+                    data-testid={`style-${val}`}
+                  >
+                    <CheckDot color={newCheckColor} dotStyle={val} size="sm" checked={true} />
+                    {label}
+                  </button>
+                ))}
               </div>
 
               {/* Color palette */}
