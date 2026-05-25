@@ -11,7 +11,7 @@ import { GlassWater } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
-import { AlertCircle, Droplets, Calendar as CalendarIcon, CheckCircle2, ArrowRight, ChefHat, Utensils, Settings, ChevronLeft, ChevronRight, X, Plus, Trash2, Check } from "lucide-react";
+import { AlertCircle, Droplets, Calendar as CalendarIcon, CheckCircle2, ArrowRight, ChefHat, Utensils, Settings, ChevronLeft, ChevronRight, X, Plus, Trash2, GripVertical } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -63,27 +63,17 @@ export default function Home() {
 
   const [newCheckName, setNewCheckName] = useState("");
   const [newCheckColor, setNewCheckColor] = useState("#10b981");
-  const [newCheckStyle, setNewCheckStyle] = useState<"filled" | "outline" | "triangle" | "diamond">("filled");
+  const [newCheckStyle, setNewCheckStyle] = useState<"filled" | "triangle" | "diamond" | "heart">("filled");
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
   const [newCheckTrack, setNewCheckTrack] = useState(false);
 
   const PRESET_COLORS = [
-    // Rossi/Arancioni
-    "#ef4444", "#dc2626", "#f97316", "#ea580c", "#fb923c",
-    // Gialli/Verdi lime
-    "#eab308", "#ca8a04", "#84cc16", "#65a30d",
-    // Verdi
-    "#22c55e", "#16a34a", "#10b981", "#059669",
-    // Ciano/Azzurri
-    "#06b6d4", "#0891b2", "#38bdf8", "#0284c7",
-    // Blu/Indigo
-    "#3b82f6", "#2563eb", "#6366f1", "#4f46e5",
-    // Viola/Rosa
-    "#8b5cf6", "#7c3aed", "#a855f7", "#ec4899", "#db2777",
-    // Toni neutri/caldi
-    "#f43f5e", "#e11d48", "#78716c", "#57534e",
+    "#ef4444", "#f97316", "#eab308", "#22c55e", "#10b981",
+    "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899", "#78716c",
   ];
 
-  // SVG-based shape renderer — supports circle filled, circle outline, triangle, diamond
+  // SVG shape renderer — filled when checked, outline when not. No checkmark inside.
   const CheckDot = ({ color, dotStyle, size = "sm", checked }: {
     color: string; dotStyle: string; size?: "sm" | "md" | "lg"; checked: boolean;
   }) => {
@@ -91,60 +81,68 @@ export default function Home() {
     const sw = 2;
     const pad = sw + 1;
     const half = s / 2;
-    // Checkmark path scaled to the SVG viewBox
-    const ck = `M${s*0.22},${s*0.52} L${s*0.42},${s*0.72} L${s*0.78},${s*0.28}`;
-    const ckColor = (dotStyle === "outline") ? color : "white";
+    const fill = checked ? color : "none";
 
-    let shape: React.ReactNode;
-    if (dotStyle === "outline") {
-      shape = (
-        <circle cx={half} cy={half} r={half - sw}
-          fill="none" stroke={color} strokeWidth={checked ? 3 : sw} />
-      );
-    } else if (dotStyle === "triangle") {
-      shape = (
-        <polygon points={`${half},${pad} ${pad},${s - pad} ${s - pad},${s - pad}`}
-          fill={checked ? color : "none"} stroke={color} strokeWidth={sw} />
-      );
-    } else if (dotStyle === "diamond") {
-      shape = (
-        <polygon points={`${half},${pad} ${s - pad},${half} ${half},${s - pad} ${pad},${half}`}
-          fill={checked ? color : "none"} stroke={color} strokeWidth={sw} />
-      );
-    } else {
-      // default: "filled" circle
-      shape = (
-        <circle cx={half} cy={half} r={half - sw}
-          fill={checked ? color : "none"} stroke={color} strokeWidth={sw} />
+    if (dotStyle === "triangle") {
+      return (
+        <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} className="shrink-0">
+          <polygon points={`${half},${pad} ${pad},${s-pad} ${s-pad},${s-pad}`}
+            fill={fill} stroke={color} strokeWidth={sw} strokeLinejoin="round" />
+        </svg>
       );
     }
-
+    if (dotStyle === "diamond") {
+      return (
+        <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} className="shrink-0">
+          <polygon points={`${half},${pad} ${s-pad},${half} ${half},${s-pad} ${pad},${half}`}
+            fill={fill} stroke={color} strokeWidth={sw} strokeLinejoin="round" />
+        </svg>
+      );
+    }
+    if (dotStyle === "heart") {
+      const sc = s / 24;
+      return (
+        <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} className="shrink-0">
+          <g transform={`scale(${sc})`}>
+            <path d="M12,20.5 C12,20.5 2.5,14 2.5,8.5 A4.75,4.75,0,0,1,12,6.2 A4.75,4.75,0,0,1,21.5,8.5 C21.5,14 12,20.5 12,20.5 Z"
+              fill={fill} stroke={color} strokeWidth={sw / sc} strokeLinejoin="round" />
+          </g>
+        </svg>
+      );
+    }
+    // default: filled circle
     return (
       <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} className="shrink-0">
-        {shape}
-        {checked && (
-          <path d={ck} fill="none" stroke={ckColor} strokeWidth={2.5}
-            strokeLinecap="round" strokeLinejoin="round" />
-        )}
+        <circle cx={half} cy={half} r={half - sw} fill={fill} stroke={color} strokeWidth={sw} />
       </svg>
     );
   };
 
-  // Mini dot for the calendar (6×6 SVG)
+  // Mini dot for the calendar — always filled
   const CalDot = ({ color, dotStyle }: { color: string; dotStyle: string }) => {
-    const s = 6;
-    const half = 3;
-    const pad = 0.5;
-    if (dotStyle === "outline") {
-      return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><circle cx={half} cy={half} r={half - pad} fill="none" stroke={color} strokeWidth={1} /></svg>;
-    }
-    if (dotStyle === "triangle") {
-      return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><polygon points={`${half},${pad} ${pad},${s-pad} ${s-pad},${s-pad}`} fill={color} /></svg>;
-    }
-    if (dotStyle === "diamond") {
-      return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><polygon points={`${half},${pad} ${s-pad},${half} ${half},${s-pad} ${pad},${half}`} fill={color} /></svg>;
-    }
-    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><circle cx={half} cy={half} r={half - pad} fill={color} /></svg>;
+    const s = 7; const h = s / 2; const p = 0.6;
+    if (dotStyle === "triangle")
+      return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><polygon points={`${h},${p} ${p},${s-p} ${s-p},${s-p}`} fill={color} /></svg>;
+    if (dotStyle === "diamond")
+      return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><polygon points={`${h},${p} ${s-p},${h} ${h},${s-p} ${p},${h}`} fill={color} /></svg>;
+    if (dotStyle === "heart")
+      return <svg width={s} height={s} viewBox="0 0 24 24"><path d="M12,20.5 C12,20.5 2.5,14 2.5,8.5 A4.75,4.75,0,0,1,12,6.2 A4.75,4.75,0,0,1,21.5,8.5 C21.5,14 12,20.5 12,20.5 Z" fill={color} /></svg>;
+    return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><circle cx={h} cy={h} r={h - p} fill={color} /></svg>;
+  };
+
+  // Drag-to-reorder helpers for daily checks settings
+  const handleDragStart = (id: number) => setDragId(id);
+  const handleDragOver = (e: React.DragEvent, id: number) => { e.preventDefault(); setDragOverId(id); };
+  const handleDrop = (targetId: number) => {
+    if (dragId === null || dragId === targetId) { setDragId(null); setDragOverId(null); return; }
+    const sorted = [...(dailyChecks || [])].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+    const fromIdx = sorted.findIndex((c: any) => c.id === dragId);
+    const toIdx = sorted.findIndex((c: any) => c.id === targetId);
+    const reordered = [...sorted];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    reordered.forEach((c: any, i: number) => { if ((c.order ?? 0) !== i) updateDailyCheck.mutate({ id: c.id, order: i }); });
+    setDragId(null); setDragOverId(null);
   };
 
   const queryClient = useQueryClient();
@@ -558,10 +556,20 @@ export default function Home() {
                 <p className="text-xs text-muted-foreground italic">Nessun check ancora creato.</p>
               ) : (
                 <div className="space-y-2">
-                  {dailyChecks.map((check: any) => (
-                    <div key={check.id} className="space-y-3 p-3 rounded-xl border bg-card" data-testid={`manage-check-${check.id}`}>
-                      {/* Row 1: preview dot + name input + giorni + delete */}
+                  {[...(dailyChecks || [])].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0)).map((check: any) => (
+                    <div
+                      key={check.id}
+                      draggable
+                      onDragStart={() => handleDragStart(check.id)}
+                      onDragOver={(e) => handleDragOver(e, check.id)}
+                      onDrop={() => handleDrop(check.id)}
+                      onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                      className={`space-y-3 p-3 rounded-xl border bg-card transition-all ${dragOverId === check.id && dragId !== check.id ? "border-primary bg-primary/5 scale-[1.01]" : ""}`}
+                      data-testid={`manage-check-${check.id}`}
+                    >
+                      {/* Row 1: drag handle + preview dot + name input + giorni + delete */}
                       <div className="flex items-center gap-2">
+                        <GripVertical className="w-4 h-4 text-muted-foreground/50 cursor-grab shrink-0" />
                         <CheckDot color={check.color} dotStyle={check.dotStyle || "filled"} size="sm" checked={true} />
                         <Input
                           defaultValue={check.name}
@@ -596,13 +604,13 @@ export default function Home() {
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
-                      {/* Row 2: shape selector 2×2 grid */}
+                      {/* Row 2: shape selector */}
                       <div className="grid grid-cols-4 gap-1.5">
                         {[
                           { val: "filled", label: "Cerchio" },
-                          { val: "outline", label: "Bordo" },
                           { val: "triangle", label: "Triangolo" },
                           { val: "diamond", label: "Rombo" },
+                          { val: "heart", label: "Cuore" },
                         ].map(({ val, label }) => {
                           const active = (check.dotStyle || "filled") === val;
                           return (
@@ -611,7 +619,7 @@ export default function Home() {
                               onClick={() => updateDailyCheck.mutate({ id: check.id, dotStyle: val })}
                               className={`flex flex-col items-center gap-1 py-1.5 rounded-lg border text-[10px] font-bold transition-all ${active ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
                             >
-                              <CheckDot color={check.color} dotStyle={val} size="sm" checked={true} />
+                              <CheckDot color={active ? check.color : "#9ca3af"} dotStyle={val} size="sm" checked={true} />
                               {label}
                             </button>
                           );
@@ -669,9 +677,9 @@ export default function Home() {
               <div className="grid grid-cols-4 gap-2">
                 {[
                   { val: "filled" as const, label: "Cerchio" },
-                  { val: "outline" as const, label: "Bordo" },
                   { val: "triangle" as const, label: "Triangolo" },
                   { val: "diamond" as const, label: "Rombo" },
+                  { val: "heart" as const, label: "Cuore" },
                 ].map(({ val, label }) => (
                   <button
                     key={val}
@@ -679,7 +687,7 @@ export default function Home() {
                     className={`flex flex-col items-center gap-1.5 py-2 rounded-xl border text-[10px] font-bold transition-all ${newCheckStyle === val ? "border-primary bg-primary/10 text-primary" : "border-muted text-muted-foreground hover:border-muted-foreground"}`}
                     data-testid={`style-${val}`}
                   >
-                    <CheckDot color={newCheckColor} dotStyle={val} size="sm" checked={true} />
+                    <CheckDot color={newCheckStyle === val ? newCheckColor : "#9ca3af"} dotStyle={val} size="sm" checked={true} />
                     {label}
                   </button>
                 ))}
