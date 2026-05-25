@@ -84,18 +84,34 @@ export default function Home() {
     const fill = checked ? color : "none";
 
     if (dotStyle === "triangle") {
+      // Dog paw print
+      const sc = s / 24;
       return (
         <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} className="shrink-0">
-          <polygon points={`${half},${pad} ${pad},${s-pad} ${s-pad},${s-pad}`}
-            fill={fill} stroke={color} strokeWidth={sw} strokeLinejoin="round" />
+          <g transform={`scale(${sc})`}>
+            {/* main pad */}
+            <ellipse cx="12" cy="16.5" rx="5" ry="3.8" fill={fill} stroke={color} strokeWidth={sw / sc} />
+            {/* top-left toe */}
+            <ellipse cx="7" cy="10.5" rx="2.1" ry="2.6" transform="rotate(-20,7,10.5)" fill={fill} stroke={color} strokeWidth={sw / sc} />
+            {/* top-right toe */}
+            <ellipse cx="17" cy="10.5" rx="2.1" ry="2.6" transform="rotate(20,17,10.5)" fill={fill} stroke={color} strokeWidth={sw / sc} />
+            {/* mid-left toe */}
+            <ellipse cx="4.5" cy="14" rx="1.8" ry="2.3" transform="rotate(-35,4.5,14)" fill={fill} stroke={color} strokeWidth={sw / sc} />
+            {/* mid-right toe */}
+            <ellipse cx="19.5" cy="14" rx="1.8" ry="2.3" transform="rotate(35,19.5,14)" fill={fill} stroke={color} strokeWidth={sw / sc} />
+          </g>
         </svg>
       );
     }
     if (dotStyle === "diamond") {
+      // 4-pointed sparkle star ✨
+      const sc = s / 24;
       return (
         <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} className="shrink-0">
-          <polygon points={`${half},${pad} ${s-pad},${half} ${half},${s-pad} ${pad},${half}`}
-            fill={fill} stroke={color} strokeWidth={sw} strokeLinejoin="round" />
+          <g transform={`scale(${sc})`}>
+            <path d="M12,1.5 Q13.2,10.8 22.5,12 Q13.2,13.2 12,22.5 Q10.8,13.2 1.5,12 Q10.8,10.8 12,1.5 Z"
+              fill={fill} stroke={color} strokeWidth={sw / sc} strokeLinejoin="round" />
+          </g>
         </svg>
       );
     }
@@ -120,11 +136,11 @@ export default function Home() {
 
   // Mini dot for the calendar — always filled
   const CalDot = ({ color, dotStyle }: { color: string; dotStyle: string }) => {
-    const s = 7; const h = s / 2; const p = 0.6;
-    if (dotStyle === "triangle")
-      return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><polygon points={`${h},${p} ${p},${s-p} ${s-p},${s-p}`} fill={color} /></svg>;
-    if (dotStyle === "diamond")
-      return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><polygon points={`${h},${p} ${s-p},${h} ${h},${s-p} ${p},${h}`} fill={color} /></svg>;
+    const s = 7; const h = s / 2; const p = 0.4;
+    if (dotStyle === "triangle") // paw — simplified as filled circle for mini size
+      return <svg width={s} height={s} viewBox="0 0 24 24"><ellipse cx="12" cy="16.5" rx="5" ry="3.8" fill={color} /><ellipse cx="7" cy="10.5" rx="2.1" ry="2.6" transform="rotate(-20,7,10.5)" fill={color} /><ellipse cx="17" cy="10.5" rx="2.1" ry="2.6" transform="rotate(20,17,10.5)" fill={color} /><ellipse cx="4.5" cy="14" rx="1.8" ry="2.3" transform="rotate(-35,4.5,14)" fill={color} /><ellipse cx="19.5" cy="14" rx="1.8" ry="2.3" transform="rotate(35,19.5,14)" fill={color} /></svg>;
+    if (dotStyle === "diamond") // star sparkle
+      return <svg width={s} height={s} viewBox="0 0 24 24"><path d="M12,1.5 Q13.2,10.8 22.5,12 Q13.2,13.2 12,22.5 Q10.8,13.2 1.5,12 Q10.8,10.8 12,1.5 Z" fill={color} /></svg>;
     if (dotStyle === "heart")
       return <svg width={s} height={s} viewBox="0 0 24 24"><path d="M12,20.5 C12,20.5 2.5,14 2.5,8.5 A4.75,4.75,0,0,1,12,6.2 A4.75,4.75,0,0,1,21.5,8.5 C21.5,14 12,20.5 12,20.5 Z" fill={color} /></svg>;
     return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}><circle cx={h} cy={h} r={h - p} fill={color} /></svg>;
@@ -624,8 +640,8 @@ export default function Home() {
                       <div className="grid grid-cols-4 gap-1.5">
                         {[
                           { val: "filled", label: "Cerchio" },
-                          { val: "triangle", label: "Triangolo" },
-                          { val: "diamond", label: "Rombo" },
+                          { val: "triangle", label: "Zampa" },
+                          { val: "diamond", label: "Stella" },
                           { val: "heart", label: "Cuore" },
                         ].map(({ val, label }) => {
                           const active = (check.dotStyle || "filled") === val;
@@ -693,8 +709,8 @@ export default function Home() {
               <div className="grid grid-cols-4 gap-2">
                 {[
                   { val: "filled" as const, label: "Cerchio" },
-                  { val: "triangle" as const, label: "Triangolo" },
-                  { val: "diamond" as const, label: "Rombo" },
+                  { val: "triangle" as const, label: "Zampa" },
+                  { val: "diamond" as const, label: "Stella" },
                   { val: "heart" as const, label: "Cuore" },
                 ].map(({ val, label }) => (
                   <button
@@ -799,8 +815,8 @@ export default function Home() {
             <div className="grid grid-cols-4 gap-2">
               {([
                 { val: "filled" as const, label: "Cerchio" },
-                { val: "triangle" as const, label: "Triangolo" },
-                { val: "diamond" as const, label: "Rombo" },
+                { val: "triangle" as const, label: "Zampa" },
+                { val: "diamond" as const, label: "Stella" },
                 { val: "heart" as const, label: "Cuore" },
               ]).map(({ val, label }) => (
                 <button
@@ -879,8 +895,8 @@ export default function Home() {
                 <div className="grid grid-cols-4 gap-2">
                   {([
                     { val: "filled", label: "Cerchio" },
-                    { val: "triangle", label: "Triangolo" },
-                    { val: "diamond", label: "Rombo" },
+                    { val: "triangle", label: "Zampa" },
+                    { val: "diamond", label: "Stella" },
                     { val: "heart", label: "Cuore" },
                   ]).map(({ val, label }) => {
                     const active = (check.dotStyle || "filled") === val;
