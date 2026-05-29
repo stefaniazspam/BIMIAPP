@@ -92,13 +92,21 @@ function formatQty(n: number): string {
   return parseFloat(n.toFixed(2)).toString();
 }
 
-// Sum two quantity strings: "1" + "2 1/2" → "3 1/2"; "1 kg" + "2" → "3 kg" (suffix preserved)
+// Sum two quantity strings: "300g"+"200g"="500g"; "1"+"2 1/2"="3 1/2"; incompatible → keep a
 function sumQty(a: string, b: string): string {
+  // Unit-aware: "300g" + "200g" → "500g", "150ml" + "50ml" → "200ml"
+  const unitMatch = (s: string) => s.trim().match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)$/);
+  const ua = unitMatch(a); const ub = unitMatch(b);
+  if (ua && ub && ua[2].toLowerCase() === ub[2].toLowerCase()) {
+    const total = parseFloat(ua[1]) + parseFloat(ub[1]);
+    const str = Number.isInteger(total) ? String(total) : parseFloat(total.toFixed(1)).toString();
+    return str + ua[2];
+  }
+  // Plain number fallback (fractions etc.)
   const na = parseQty(a);
   const nb = parseQty(b);
   if (na !== null && nb !== null) return formatQty(na + nb);
-  // If at least one is a number, try to combine
-  return a; // fallback: keep original
+  return a;
 }
 
 export default function Pantry() {

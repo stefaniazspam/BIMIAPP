@@ -454,17 +454,22 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
         pantryContext = `Utilizza principalmente questi ingredienti dalla dispensa: ${pantry.map(i => i.name).join(", ")}.`;
       }
 
-      const systemPrompt = `Sei Bimì, un'assistente culinaria. Genera una ricetta per ${servings} persone basata sulla richiesta: "${prompt}". 
+      const systemPrompt = `Sei Bimì, un'assistente culinaria. Genera una ricetta per ${servings} persone basata sulla richiesta: "${prompt}".
       ${pantryContext}
-      Rispondi ESCLUSIVAMENTE con un oggetto JSON nel seguente formato:
+      Rispondi ESCLUSIVAMENTE con un oggetto JSON nel seguente formato (NESSUN testo fuori dal JSON):
       {
         "name": "Titolo Ricetta",
         "recipe": "Procedimento passo dopo passo...",
-        "ingredients": ["ingrediente 1", "ingrediente 2"]
-      }`;
+        "ingredients": ["300g pasta", "200g pomodori pelati", "2 uova"],
+        "caloriesPerServing": 450
+      }
+      REGOLE IMPORTANTI:
+      - Esprimi le quantità degli ingredienti SEMPRE in grammi (g) o millilitri (ml) dove possibile (es: "300g pasta", "150ml latte", "50g burro").
+      - Per ingredienti non pesabili usa la forma "2 uova", "1 spicchio d'aglio", "q.b. sale".
+      - caloriesPerServing è il numero intero di kcal per PERSONA (non totale).`;
 
-      const content = await generateJson<{ name: string; recipe: string; ingredients: string[] }>(systemPrompt);
-      
+      const content = await generateJson<{ name: string; recipe: string; ingredients: string[]; caloriesPerServing?: number }>(systemPrompt);
+
       const meal = await storage.createMeal({
         userId: 1,
         date,
@@ -474,7 +479,7 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
         ingredients: content.ingredients,
         servings: servings,
         isPlanned: true,
-        calories: 0 
+        calories: content.caloriesPerServing || 0,
       });
 
       res.json(meal);

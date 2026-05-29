@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { format, startOfWeek, addDays } from "date-fns";
 import { it } from "date-fns/locale";
-import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, useDeleteMeal, useGenerateMeal, useAddToShoppingList, useCreateMeal, useUpdateMeal, useCreatePantryItem, useCreateShoppingItem, usePantryCategories } from "@/hooks/use-bimi";
+import { useDailyLog, useDailyLogs, useUpsertDailyLog, useMeals, useDeleteMeal, useGenerateMeal, useAddToShoppingList, useCreateMeal, useUpdateMeal, useCreatePantryItem, useCreateShoppingItem, useUpdateShoppingItem, useShoppingList, usePantryCategories } from "@/hooks/use-bimi";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Plus, Trash2, Utensils, Coffee, Apple, Moon, ChefHat, ShoppingCart, Loader2, Search, Sparkles, Pencil, Move } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Parse "300g pasta" → { qty: "300g", name: "Pasta" }; "2 uova" → { qty: "2", name: "uova" }
+function parseIngredient(s: string): { qty: string; name: string } {
+  const m = s.match(/^(\d+(?:[,.]\d+)?\s*(?:g|kg|ml|l|cl|dl|pz|fett[ae]|cucchiai[oi]?|cucchiaini?|tazz[ae]|bicchieri?|mazzo|mazz[oi])\.?)\s+(.+)$/i);
+  if (m) return { qty: m[1].replace(/,/g, ".").trim(), name: m[2].trim() };
+  const n = s.match(/^(\d+(?:[,.]\d+)?)\s+(.+)$/);
+  if (n) return { qty: n[1].replace(/,/g, ".").trim(), name: n[2].trim() };
+  return { qty: "1", name: s };
+}
+
+// Sum two unit-aware quantities: "300g"+"200g"="500g"; "1"+"2"="3"; incompatible → keep a
+function sumUnitQty(a: string, b: string): string {
+  const parse = (s: string) => {
+    const m = s.trim().match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]*)$/);
+    return m ? { val: parseFloat(m[1]), unit: m[2].toLowerCase() } : null;
+  };
+  const pa = parse(a); const pb = parse(b);
+  if (pa && pb && pa.unit === pb.unit) {
+    const total = pa.val + pb.val;
+    const str = Number.isInteger(total) ? String(total) : parseFloat(total.toFixed(1)).toString();
+    return str + pa.unit;
+  }
+  return a;
+}
 
 export default function Meals() {
   const [currentWeek, setCurrentWeek] = useState(new Date());
@@ -24,6 +48,8 @@ export default function Meals() {
   const updateMeal = useUpdateMeal();
   const addToShoppingList = useAddToShoppingList();
   const createShoppingItem = useCreateShoppingItem();
+  const updateShoppingItem = useUpdateShoppingItem();
+  const { data: shoppingList } = useShoppingList();
   const createPantryItem = useCreatePantryItem();
   const { data: pantryCategories } = usePantryCategories();
 
@@ -87,13 +113,23 @@ export default function Meals() {
   const handleAddSelectedToShopping = async () => {
     const items = ingPicker.filter(i => i.checked && i.name.trim());
     for (const item of items) {
-      await createShoppingItem.mutateAsync({
-        userId: 1,
-        name: item.name.trim(),
-        quantity: "1",
-        subCategory: item.category,
-        checked: false,
-      });
+      const { qty, name } = parseIngredient(item.name.trim());
+      const nameNorm = name.trim().toLowerCase();
+      const existing = (shoppingList || []).find(
+        s => !s.checked && s.name.trim().toLowerCase() === nameNorm
+      );
+      if (existing) {
+        const newQty = sumUnitQty(existing.quantity || "1", qty);
+        await updateShoppingItem.mutateAsync({ id: existing.id, quantity: newQty });
+      } else {
+        await createShoppingItem.mutateAsync({
+          userId: 1,
+          name: name.trim(),
+          quantity: qty,
+          subCategory: item.category,
+          checked: false,
+        });
+      }
     }
     setIsSelectIngOpen(false);
   };
@@ -246,12 +282,17 @@ export default function Meals() {
                           onPointerLeave={cancelLongPress}
                           onContextMenu={(e) => { e.preventDefault(); setMovingMeal(meal); setMoveDate(meal.date); setMoveType(meal.mealType); }}
                         >
-                          <p
-                            className="text-[10px] font-bold line-clamp-1 cursor-pointer leading-tight flex-1 hover:text-primary"
+                          <div
+                            className="flex-1 cursor-pointer min-w-0"
                             onClick={() => setViewRecipe(meal)}
                           >
-                            {meal.name}
-                          </p>
+                            <p className="text-[10px] font-bold line-clamp-1 leading-tight hover:text-primary">
+                              {meal.name}
+                            </p>
+                            {meal.calories ? (
+                              <p className="text-[8px] text-muted-foreground/70 leading-none mt-0.5">{meal.calories} kcal</p>
+                            ) : null}
+                          </div>
                           <button
                             className="text-muted-foreground/40 hover:text-primary p-0 shrink-0"
                             onClick={(e) => { e.stopPropagation(); setEditingMeal({ ...meal, ingredients: (meal.ingredients || []).join("\n") }); }}
@@ -482,6 +523,12 @@ export default function Meals() {
             <DialogTitle className="font-display text-2xl text-primary">{viewRecipe?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-6 py-4">
+            {viewRecipe?.calories ? (
+              <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-xl px-3 py-2 w-fit">
+                <span className="text-lg font-bold text-primary">{viewRecipe.calories}</span>
+                <span className="text-sm text-muted-foreground">kcal / persona</span>
+              </div>
+            ) : null}
             <div className="bg-muted/30 p-4 rounded-2xl">
               <h4 className="font-bold flex items-center gap-2 mb-3">
                 <ShoppingCart className="w-4 h-4 text-primary" /> Ingredienti ({viewRecipe?.servings} persone)
