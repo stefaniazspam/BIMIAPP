@@ -197,6 +197,7 @@ export default function Home() {
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const [newCheckTrack, setNewCheckTrack] = useState(false);
+  const [newCheckTrackInCalendar, setNewCheckTrackInCalendar] = useState(true);
   const [newCheckReminderEnabled, setNewCheckReminderEnabled] = useState(false);
   const [newCheckReminderTime, setNewCheckReminderTime] = useState("09:00");
   const [newCheckReminderDays, setNewCheckReminderDays] = useState<number[]>(ALL_WEEKDAYS);
@@ -361,6 +362,12 @@ export default function Home() {
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
   // Italian week starts Monday: offset 0=Mon, 6=Sun
   const firstDayOffset = (monthStart.getDay() + 6) % 7;
+  const sortedDailyChecks = [...(dailyChecks || [])].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+  const calendarTrackedChecks = sortedDailyChecks.filter((check: any) => check.trackInCalendar !== false);
+  const todayCheckGroups = [
+    { title: "Tracciati nel calendario", checks: calendarTrackedChecks },
+    { title: "Solo per oggi", checks: sortedDailyChecks.filter((check: any) => check.trackInCalendar === false) },
+  ];
 
   return (
     <div className="space-y-6 pb-20">
@@ -427,58 +434,69 @@ export default function Home() {
             {(!dailyChecks || dailyChecks.length === 0) ? (
               <p className="text-xs text-muted-foreground italic py-2">Nessun check. Tocca <strong>+</strong> per aggiungerne uno.</p>
             ) : (
-              <div className="space-y-2">
-                {[...(dailyChecks || [])].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0)).map((check: any) => {
-                  const checked = isCheckedToday(check.id);
-                  const daySince = check.trackDays ? daysSinceLastCheck(check.id) : null;
-                  return (
-                    <div
-                      key={check.id}
-                      draggable
-                      onDragStart={() => handleDragStart(check.id)}
-                      onDragOver={(e) => handleDragOver(e, check.id)}
-                      onDrop={() => handleDrop(check.id)}
-                      onDragEnd={() => { setDragId(null); setDragOverId(null); }}
-                      className={`flex items-center justify-between gap-2 rounded-lg transition-all ${dragOverId === check.id && dragId !== check.id ? "bg-primary/10 scale-[1.01]" : ""}`}
-                      data-testid={`check-row-${check.id}`}
-                    >
-                      <GripVertical className="w-4 h-4 text-muted-foreground/30 cursor-grab shrink-0" />
-                      <button
-                        onClick={() => toggleCheckLog.mutate({ checkId: check.id, date: today, checked: !checked })}
-                        className={`transition-all shrink-0 ${checked ? "scale-100" : "scale-90 opacity-60 hover:opacity-90"}`}
-                        data-testid={`button-toggle-check-${check.id}`}
-                      >
-                        <CheckDot color={check.color} dotStyle={check.dotStyle || "filled"} size="sm" checked={checked} />
-                      </button>
-                      <button
-                        onClick={() => setEditingCheckId(check.id)}
-                        className="flex-1 text-left min-w-0"
-                        data-testid={`button-edit-check-name-${check.id}`}
-                      >
-                        <span className={`text-sm font-medium ${checked ? "" : "text-muted-foreground"}`}>{check.name}</span>
-                      </button>
-                      {check.trackDays && daySince !== null && (
-                        <span
-                          className="text-xs font-bold px-2 py-1 rounded-full shrink-0"
-                          style={{ backgroundColor: `${check.color}20`, color: check.color }}
-                        >
-                          {daySince === 0 ? "oggi" : `${daySince}g`}
-                        </span>
-                      )}
-                      {check.reminderTime && (
-                        <span
-                          className="flex items-center gap-1 text-[11px] text-primary shrink-0"
-                          title={`Sveglia alle ${check.reminderTime} · ${(check.reminderDays || [])
-                            .map((day: number) => WEEKDAYS.find(item => item.value === day)?.label)
-                            .filter(Boolean).join(", ")}`}
-                        >
-                          <Bell className="h-3 w-3" />
-                          {check.reminderTime}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="space-y-4">
+                {todayCheckGroups.map(group => (
+                  <section key={group.title} className="space-y-2">
+                    <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{group.title}</h3>
+                    {group.checks.length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic">Nessun check in questa sezione.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {group.checks.map((check: any) => {
+                          const checked = isCheckedToday(check.id);
+                          const daySince = check.trackDays ? daysSinceLastCheck(check.id) : null;
+                          return (
+                            <div
+                              key={check.id}
+                              draggable
+                              onDragStart={() => handleDragStart(check.id)}
+                              onDragOver={(e) => handleDragOver(e, check.id)}
+                              onDrop={() => handleDrop(check.id)}
+                              onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                              className={`flex items-center justify-between gap-2 rounded-lg transition-all ${dragOverId === check.id && dragId !== check.id ? "bg-primary/10 scale-[1.01]" : ""}`}
+                              data-testid={`check-row-${check.id}`}
+                            >
+                              <GripVertical className="w-4 h-4 text-muted-foreground/30 cursor-grab shrink-0" />
+                              <button
+                                onClick={() => toggleCheckLog.mutate({ checkId: check.id, date: today, checked: !checked })}
+                                className={`transition-all shrink-0 ${checked ? "scale-100" : "scale-90 opacity-60 hover:opacity-90"}`}
+                                data-testid={`button-toggle-check-${check.id}`}
+                              >
+                                <CheckDot color={check.color} dotStyle={check.dotStyle || "filled"} size="sm" checked={checked} />
+                              </button>
+                              <button
+                                onClick={() => setEditingCheckId(check.id)}
+                                className="flex-1 text-left min-w-0"
+                                data-testid={`button-edit-check-name-${check.id}`}
+                              >
+                                <span className={`text-sm font-medium ${checked ? "" : "text-muted-foreground"}`}>{check.name}</span>
+                              </button>
+                              {check.trackDays && daySince !== null && (
+                                <span
+                                  className="text-xs font-bold px-2 py-1 rounded-full shrink-0"
+                                  style={{ backgroundColor: `${check.color}20`, color: check.color }}
+                                >
+                                  {daySince === 0 ? "oggi" : `${daySince}g`}
+                                </span>
+                              )}
+                              {check.reminderTime && (
+                                <span
+                                  className="flex items-center gap-1 text-[11px] text-primary shrink-0"
+                                  title={`Sveglia alle ${check.reminderTime} · ${(check.reminderDays || [])
+                                    .map((day: number) => WEEKDAYS.find(item => item.value === day)?.label)
+                                    .filter(Boolean).join(", ")}`}
+                                >
+                                  <Bell className="h-3 w-3" />
+                                  {check.reminderTime}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+                ))}
               </div>
             )}
           </div>
@@ -656,7 +674,7 @@ export default function Home() {
                 const checkIdsForDay = new Set(
                   (dailyCheckLogs || []).filter((l: any) => l.date === dateStr).map((l: any) => l.checkId)
                 );
-                const checksForDay = (dailyChecks || [])
+                const checksForDay = calendarTrackedChecks
                   .filter((c: any) => checkIdsForDay.has(c.id))
                   .slice(0, 5);
                 const isSelected = dateStr === today;
@@ -677,7 +695,7 @@ export default function Home() {
                 );
               })}
             </div>
-            <p className="text-[10px] text-muted-foreground text-center mt-3">Tocca un giorno per vedere o modificare i check</p>
+            <p className="text-[10px] text-muted-foreground text-center mt-3">Tocca un giorno per vedere o modificare i check tracciati</p>
           </div>
         </DialogContent>
       </Dialog>
@@ -691,10 +709,10 @@ export default function Home() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            {(!dailyChecks || dailyChecks.length === 0) ? (
-              <p className="text-sm text-muted-foreground italic">Nessun check configurato.</p>
+            {calendarTrackedChecks.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">Nessun check è tracciato nel calendario.</p>
             ) : (
-              dailyChecks.map((check: any) => {
+              calendarTrackedChecks.map((check: any) => {
                 const checked = selectedCalDay ? isCheckedOnDate(check.id, selectedCalDay) : false;
                 return (
                   <button
@@ -908,6 +926,17 @@ export default function Home() {
                 <label htmlFor="trackDays" className="text-sm">Conta giorni dall'ultimo check</label>
               </div>
 
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="trackInCalendar"
+                  checked={newCheckTrackInCalendar}
+                  onChange={(e) => setNewCheckTrackInCalendar(e.target.checked)}
+                  className="rounded"
+                />
+                <label htmlFor="trackInCalendar" className="text-sm">Salva nel calendario (habit tracker)</label>
+              </div>
+
               <CheckReminderFields
                 enabled={newCheckReminderEnabled}
                 time={newCheckReminderTime}
@@ -930,6 +959,7 @@ export default function Home() {
                     color: newCheckColor,
                     dotStyle: newCheckStyle,
                     trackDays: newCheckTrack,
+                    trackInCalendar: newCheckTrackInCalendar,
                     order: (dailyChecks || []).length,
                     ...newCheckReminderData(),
                   });
@@ -937,6 +967,7 @@ export default function Home() {
                   setNewCheckColor("#10b981");
                   setNewCheckStyle("filled");
                   setNewCheckTrack(false);
+                  setNewCheckTrackInCalendar(true);
                   resetNewCheckReminder();
                 }}
                 disabled={!newCheckName.trim() || createDailyCheck.isPending}
@@ -1006,6 +1037,16 @@ export default function Home() {
               <input type="checkbox" id="trackDaysQuick" checked={newCheckTrack} onChange={(e) => setNewCheckTrack(e.target.checked)} className="rounded" />
               <label htmlFor="trackDaysQuick" className="text-sm">Conta giorni dall'ultimo check</label>
             </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="trackInCalendarQuick"
+                checked={newCheckTrackInCalendar}
+                onChange={(e) => setNewCheckTrackInCalendar(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="trackInCalendarQuick" className="text-sm">Salva nel calendario (habit tracker)</label>
+            </div>
             <CheckReminderFields
               enabled={newCheckReminderEnabled}
               time={newCheckReminderTime}
@@ -1027,10 +1068,11 @@ export default function Home() {
                   color: newCheckColor,
                   dotStyle: newCheckStyle,
                   trackDays: newCheckTrack,
+                  trackInCalendar: newCheckTrackInCalendar,
                   order: (dailyChecks || []).length,
                   ...newCheckReminderData(),
                 });
-                setNewCheckName(""); setNewCheckColor("#10b981"); setNewCheckStyle("filled"); setNewCheckTrack(false); resetNewCheckReminder();
+                setNewCheckName(""); setNewCheckColor("#10b981"); setNewCheckStyle("filled"); setNewCheckTrack(false); setNewCheckTrackInCalendar(true); resetNewCheckReminder();
                 setIsAddCheckOpen(false);
               }}
               disabled={!newCheckName.trim() || createDailyCheck.isPending}
@@ -1118,6 +1160,16 @@ export default function Home() {
                   onDaysChange={(reminderDays) => updateDailyCheck.mutate({ id: check.id, reminderDays })}
                   onEnableNotifications={subscribeToPush}
                 />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`trackInCalendarEdit-${check.id}`}
+                    checked={check.trackInCalendar !== false}
+                    onChange={(e) => updateDailyCheck.mutate({ id: check.id, trackInCalendar: e.target.checked })}
+                    className="rounded"
+                  />
+                  <label htmlFor={`trackInCalendarEdit-${check.id}`} className="text-sm">Salva nel calendario (habit tracker)</label>
+                </div>
                 {/* Track days + delete */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">

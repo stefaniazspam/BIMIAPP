@@ -453,6 +453,7 @@ export function useCreateDailyCheck() {
       color: string;
       dotStyle?: string;
       trackDays?: boolean;
+      trackInCalendar?: boolean;
       order?: number;
       reminderTime?: string | null;
       reminderDays?: number[] | null;

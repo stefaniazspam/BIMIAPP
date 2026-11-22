@@ -95,6 +95,7 @@ export const dailyChecks = pgTable("daily_checks", {
   color: text("color").notNull().default("#10b981"), // hex color for the calendar dot
   dotStyle: text("dot_style").notNull().default("filled"), // "filled" | "outline"
   trackDays: boolean("track_days").default(false), // if true, show counter of days since last check (e.g., for period)
+  trackInCalendar: boolean("track_in_calendar").notNull().default(true),
   order: integer("order").notNull().default(0),
   reminderTime: text("reminder_time"),
   reminderDays: integer("reminder_days").array(),
