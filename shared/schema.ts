@@ -96,6 +96,10 @@ export const dailyChecks = pgTable("daily_checks", {
   dotStyle: text("dot_style").notNull().default("filled"), // "filled" | "outline"
   trackDays: boolean("track_days").default(false), // if true, show counter of days since last check (e.g., for period)
   order: integer("order").notNull().default(0),
+  reminderTime: text("reminder_time"),
+  reminderDays: integer("reminder_days").array(),
+  reminderTimezone: text("reminder_timezone").notNull().default("Europe/Rome"),
+  lastReminderSentDate: text("last_reminder_sent_date"),
 });
 
 // --- Daily Check Logs (one row = one check on a specific date) ---

@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { users, dailyLogs, meals, pantryItems, shoppingListItems, reminders, pushSubscriptions, insertPantryItemSchema, insertShoppingListItemSchema, insertReminderSchema } from "@shared/schema";
-import { eq, lte, and } from "drizzle-orm";
+import { users, dailyLogs, meals, pantryItems, shoppingListItems, reminders, pushSubscriptions, dailyChecks, dailyCheckLogs, insertPantryItemSchema, insertShoppingListItemSchema, insertReminderSchema } from "@shared/schema";
+import { eq, lte, and, isNotNull } from "drizzle-orm";
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
@@ -577,8 +577,11 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
     }
   });
 
-  // Scheduler: check reminders every minute and send push notifications
+  // Scheduler: check reminders and recurring daily-check notifications every minute.
+  let isCheckingNotifications = false;
   setInterval(async () => {
+    if (isCheckingNotifications) return;
+    isCheckingNotifications = true;
     try {
       const now = new Date();
       const windowEnd = new Date(now.getTime() + 60000); // next 60s
@@ -619,8 +622,98 @@ Se chiede di aggiungere un promemoria, usa la funzione "add_reminder". Per il pa
           }
         }
       }
+
+      const scheduledChecks = await db.select().from(dailyChecks)
+        .where(isNotNull(dailyChecks.reminderTime));
+      if (scheduledChecks.length === 0) return;
+
+      const subscriptions = await db.select().from(pushSubscriptions)
+        .where(eq(pushSubscriptions.userId, 1));
+      if (subscriptions.length === 0) return;
+
+      const weekdayNumbers: Record<string, number> = {
+        Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+      };
+      const localTimeParts = (date: Date, timeZone: string) => {
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone,
+          weekday: "short",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        }).formatToParts(date);
+        const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+        return {
+          date: `${values.year}-${values.month}-${values.day}`,
+          weekday: weekdayNumbers[values.weekday],
+          minutes: Number(values.hour) * 60 + Number(values.minute),
+        };
+      };
+
+      for (const check of scheduledChecks) {
+        if (!check.reminderTime || !check.reminderDays?.length) continue;
+
+        let localNow: ReturnType<typeof localTimeParts>;
+        try {
+          localNow = localTimeParts(now, check.reminderTimezone || "Europe/Rome");
+        } catch {
+          console.error(`Invalid reminder timezone for daily check ${check.id}`);
+          continue;
+        }
+        const [hour, minute] = check.reminderTime.split(":").map(Number);
+        const minutesPastSchedule = localNow.minutes - (hour * 60 + minute);
+        if (
+          !check.reminderDays.includes(localNow.weekday) ||
+          minutesPastSchedule < 0 ||
+          minutesPastSchedule > 1 ||
+          check.lastReminderSentDate === localNow.date
+        ) continue;
+
+        const logsForToday = await db.select({ checkId: dailyCheckLogs.checkId })
+          .from(dailyCheckLogs)
+          .where(and(
+            eq(dailyCheckLogs.userId, check.userId),
+            eq(dailyCheckLogs.date, localNow.date),
+            eq(dailyCheckLogs.checkId, check.id),
+          ));
+        if (logsForToday.length > 0) continue;
+
+        let delivered = false;
+        for (const sub of subscriptions) {
+          try {
+            await webpush.sendNotification(
+              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+              JSON.stringify({
+                title: `⏰ ${check.name}`,
+                body: "È il momento di completare il check di oggi.",
+                tag: `daily-check-${check.id}-${localNow.date}`,
+                dailyCheckId: check.id,
+                url: "/",
+              })
+            );
+            delivered = true;
+          } catch (e: any) {
+            if (e.statusCode === 410 || e.statusCode === 404) {
+              await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
+            } else {
+              console.error(`Daily check notification error for check ${check.id}:`, e);
+            }
+          }
+        }
+
+        if (delivered) {
+          await db.update(dailyChecks)
+            .set({ lastReminderSentDate: localNow.date })
+            .where(eq(dailyChecks.id, check.id));
+        }
+      }
     } catch (err) {
-      console.error("Reminder scheduler error:", err);
+      console.error("Notification scheduler error:", err);
+    } finally {
+      isCheckingNotifications = false;
     }
   }, 60000);
 

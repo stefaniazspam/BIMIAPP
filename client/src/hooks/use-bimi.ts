@@ -448,12 +448,22 @@ export function useDailyChecks() {
 export function useCreateDailyCheck() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { name: string; color: string; trackDays?: boolean; order?: number }) => {
+    mutationFn: async (data: {
+      name: string;
+      color: string;
+      dotStyle?: string;
+      trackDays?: boolean;
+      order?: number;
+      reminderTime?: string | null;
+      reminderDays?: number[] | null;
+      reminderTimezone?: string;
+    }) => {
       const res = await fetch("/api/daily-checks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      if (!res.ok) throw new Error("Failed to create daily check");
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/daily-checks"] }),
@@ -469,6 +479,7 @@ export function useUpdateDailyCheck() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
       });
+      if (!res.ok) throw new Error("Failed to update daily check");
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/daily-checks"] }),

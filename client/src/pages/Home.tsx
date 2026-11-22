@@ -11,13 +11,136 @@ import { GlassWater } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
-import { AlertCircle, Droplets, Calendar as CalendarIcon, CheckCircle2, ArrowRight, ChefHat, Utensils, Settings, ChevronLeft, ChevronRight, X, Plus, Trash2, GripVertical } from "lucide-react";
+import { AlertCircle, Droplets, Calendar as CalendarIcon, CheckCircle2, ArrowRight, ChefHat, Utensils, Settings, ChevronLeft, ChevronRight, X, Plus, Trash2, GripVertical, Bell, BellRing, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
+
+const WEEKDAYS = [
+  { value: 1, short: "L", label: "Lunedì" },
+  { value: 2, short: "M", label: "Martedì" },
+  { value: 3, short: "M", label: "Mercoledì" },
+  { value: 4, short: "G", label: "Giovedì" },
+  { value: 5, short: "V", label: "Venerdì" },
+  { value: 6, short: "S", label: "Sabato" },
+  { value: 0, short: "D", label: "Domenica" },
+];
+
+const ALL_WEEKDAYS = WEEKDAYS.map(day => day.value);
+
+function CheckReminderFields({
+  enabled,
+  time,
+  days,
+  isSupported,
+  permission,
+  isSubscribed,
+  isLoading,
+  onEnabledChange,
+  onTimeChange,
+  onDaysChange,
+  onEnableNotifications,
+}: {
+  enabled: boolean;
+  time: string;
+  days: number[];
+  isSupported: boolean;
+  permission: string;
+  isSubscribed: boolean;
+  isLoading: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  onTimeChange: (time: string) => void;
+  onDaysChange: (days: number[]) => void;
+  onEnableNotifications: () => Promise<boolean>;
+}) {
+  const [activationFailed, setActivationFailed] = useState(false);
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border/70 p-3">
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(event) => onEnabledChange(event.target.checked)}
+          className="rounded"
+        />
+        <Bell className="w-4 h-4 text-primary" />
+        <span className="text-sm font-semibold">Imposta una sveglia</span>
+      </label>
+      {enabled && (
+        <div className="space-y-3 pl-1">
+          <p className="text-xs text-muted-foreground">
+            Ricevi un avviso solo se non hai ancora spuntato il check quel giorno.
+          </p>
+          <label className="flex items-center justify-between gap-3">
+            <span className="text-sm">Orario</span>
+            <Input
+              type="time"
+              value={time}
+              onChange={(event) => onTimeChange(event.target.value)}
+              className="w-32 rounded-lg"
+              aria-label="Orario della sveglia"
+            />
+          </label>
+          <div className="space-y-2">
+            <p className="text-sm">Giorni della settimana</p>
+            <div className="flex justify-between gap-1">
+              {WEEKDAYS.map(day => {
+                const selected = days.includes(day.value);
+                return (
+                  <button
+                    key={day.value}
+                    type="button"
+                    aria-label={day.label}
+                    aria-pressed={selected}
+                    title={day.label}
+                    disabled={selected && days.length === 1}
+                    onClick={() => onDaysChange(
+                      selected ? days.filter(value => value !== day.value) : [...days, day.value]
+                    )}
+                    className={`h-8 w-8 rounded-full text-xs font-semibold transition-colors ${
+                      selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    {day.short}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {!isSupported ? (
+            <p className="text-xs text-muted-foreground">Le notifiche push non sono supportate da questo browser.</p>
+          ) : isSubscribed ? (
+            <p className="flex items-center gap-1.5 text-xs text-primary">
+              <BellRing className="w-3.5 h-3.5" /> Notifiche attive su questo dispositivo
+            </p>
+          ) : permission === "denied" ? (
+            <p className="text-xs text-muted-foreground">Notifiche bloccate dal browser: riabilitale nelle impostazioni del sito.</p>
+          ) : (
+            <div className="space-y-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 rounded-lg"
+                disabled={isLoading}
+                onClick={async () => setActivationFailed(!(await onEnableNotifications()))}
+              >
+                {isLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Bell className="mr-1.5 h-3.5 w-3.5" />}
+                Attiva notifiche su questo dispositivo
+              </Button>
+              {activationFailed && <p className="text-xs text-destructive">Non è stato possibile attivare le notifiche.</p>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const getExpirationLabel = (date: string) => {
   const exp = new Date(date);
@@ -33,6 +156,13 @@ const getExpirationLabel = (date: string) => {
 
 export default function Home() {
   const today = format(new Date(), "yyyy-MM-dd");
+  const {
+    isSupported: pushSupported,
+    permission: pushPermission,
+    isSubscribed: pushIsSubscribed,
+    isLoading: pushIsLoading,
+    subscribe: subscribeToPush,
+  } = usePushNotifications();
   const { data: user } = useUser();
   const { data: dailyLog, isLoading: logLoading } = useDailyLog(today);
   const { data: dailyLogs } = useDailyLogs();
@@ -67,6 +197,21 @@ export default function Home() {
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const [newCheckTrack, setNewCheckTrack] = useState(false);
+  const [newCheckReminderEnabled, setNewCheckReminderEnabled] = useState(false);
+  const [newCheckReminderTime, setNewCheckReminderTime] = useState("09:00");
+  const [newCheckReminderDays, setNewCheckReminderDays] = useState<number[]>(ALL_WEEKDAYS);
+
+  const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Rome";
+  const newCheckReminderData = () => ({
+    reminderTime: newCheckReminderEnabled ? newCheckReminderTime : null,
+    reminderDays: newCheckReminderEnabled ? newCheckReminderDays : null,
+    ...(newCheckReminderEnabled ? { reminderTimezone: browserTimeZone() } : {}),
+  });
+  const resetNewCheckReminder = () => {
+    setNewCheckReminderEnabled(false);
+    setNewCheckReminderTime("09:00");
+    setNewCheckReminderDays(ALL_WEEKDAYS);
+  };
 
   const PRESET_COLORS = [
     "#ef4444", "#f97316", "#eab308", "#22c55e", "#10b981",
@@ -318,6 +463,17 @@ export default function Home() {
                           style={{ backgroundColor: `${check.color}20`, color: check.color }}
                         >
                           {daySince === 0 ? "oggi" : `${daySince}g`}
+                        </span>
+                      )}
+                      {check.reminderTime && (
+                        <span
+                          className="flex items-center gap-1 text-[11px] text-primary shrink-0"
+                          title={`Sveglia alle ${check.reminderTime} · ${(check.reminderDays || [])
+                            .map((day: number) => WEEKDAYS.find(item => item.value === day)?.label)
+                            .filter(Boolean).join(", ")}`}
+                        >
+                          <Bell className="h-3 w-3" />
+                          {check.reminderTime}
                         </span>
                       )}
                     </div>
@@ -752,6 +908,20 @@ export default function Home() {
                 <label htmlFor="trackDays" className="text-sm">Conta giorni dall'ultimo check</label>
               </div>
 
+              <CheckReminderFields
+                enabled={newCheckReminderEnabled}
+                time={newCheckReminderTime}
+                days={newCheckReminderDays}
+                isSupported={pushSupported}
+                permission={pushPermission}
+                isSubscribed={pushIsSubscribed}
+                isLoading={pushIsLoading}
+                onEnabledChange={(enabled) => setNewCheckReminderEnabled(enabled)}
+                onTimeChange={setNewCheckReminderTime}
+                onDaysChange={setNewCheckReminderDays}
+                onEnableNotifications={subscribeToPush}
+              />
+
               <Button
                 onClick={() => {
                   if (!newCheckName.trim()) return;
@@ -761,11 +931,13 @@ export default function Home() {
                     dotStyle: newCheckStyle,
                     trackDays: newCheckTrack,
                     order: (dailyChecks || []).length,
+                    ...newCheckReminderData(),
                   });
                   setNewCheckName("");
                   setNewCheckColor("#10b981");
                   setNewCheckStyle("filled");
                   setNewCheckTrack(false);
+                  resetNewCheckReminder();
                 }}
                 disabled={!newCheckName.trim() || createDailyCheck.isPending}
                 className="w-full rounded-xl font-bold"
@@ -780,7 +952,7 @@ export default function Home() {
 
       {/* ── Dialogo "Aggiungi check" ── */}
       <Dialog open={isAddCheckOpen} onOpenChange={setIsAddCheckOpen}>
-        <DialogContent className="sm:max-w-sm rounded-3xl">
+        <DialogContent className="sm:max-w-sm rounded-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-xl">Nuovo check</DialogTitle>
           </DialogHeader>
@@ -834,6 +1006,19 @@ export default function Home() {
               <input type="checkbox" id="trackDaysQuick" checked={newCheckTrack} onChange={(e) => setNewCheckTrack(e.target.checked)} className="rounded" />
               <label htmlFor="trackDaysQuick" className="text-sm">Conta giorni dall'ultimo check</label>
             </div>
+            <CheckReminderFields
+              enabled={newCheckReminderEnabled}
+              time={newCheckReminderTime}
+              days={newCheckReminderDays}
+              isSupported={pushSupported}
+              permission={pushPermission}
+              isSubscribed={pushIsSubscribed}
+              isLoading={pushIsLoading}
+              onEnabledChange={(enabled) => setNewCheckReminderEnabled(enabled)}
+              onTimeChange={setNewCheckReminderTime}
+              onDaysChange={setNewCheckReminderDays}
+              onEnableNotifications={subscribeToPush}
+            />
             <Button
               onClick={() => {
                 if (!newCheckName.trim()) return;
@@ -843,8 +1028,9 @@ export default function Home() {
                   dotStyle: newCheckStyle,
                   trackDays: newCheckTrack,
                   order: (dailyChecks || []).length,
+                  ...newCheckReminderData(),
                 });
-                setNewCheckName(""); setNewCheckColor("#10b981"); setNewCheckStyle("filled"); setNewCheckTrack(false);
+                setNewCheckName(""); setNewCheckColor("#10b981"); setNewCheckStyle("filled"); setNewCheckTrack(false); resetNewCheckReminder();
                 setIsAddCheckOpen(false);
               }}
               disabled={!newCheckName.trim() || createDailyCheck.isPending}
@@ -862,7 +1048,7 @@ export default function Home() {
         if (!check) return null;
         return (
           <Dialog open={true} onOpenChange={() => setEditingCheckId(null)}>
-            <DialogContent className="sm:max-w-sm rounded-3xl">
+            <DialogContent className="sm:max-w-sm rounded-3xl max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-display text-xl flex items-center gap-3">
                   <CheckDot color={check.color} dotStyle={check.dotStyle || "filled"} size="md" checked={true} />
@@ -912,6 +1098,26 @@ export default function Home() {
                     <input type="color" className="sr-only" value={check.color} onChange={(e) => updateDailyCheck.mutate({ id: check.id, color: e.target.value })} />
                   </label>
                 </div>
+                <CheckReminderFields
+                  enabled={!!check.reminderTime}
+                  time={check.reminderTime || "09:00"}
+                  days={check.reminderDays?.length ? check.reminderDays : ALL_WEEKDAYS}
+                  isSupported={pushSupported}
+                  permission={pushPermission}
+                  isSubscribed={pushIsSubscribed}
+                  isLoading={pushIsLoading}
+                  onEnabledChange={(enabled) => updateDailyCheck.mutate({
+                    id: check.id,
+                    reminderTime: enabled ? (check.reminderTime || "09:00") : null,
+                    reminderDays: enabled
+                      ? (check.reminderDays?.length ? check.reminderDays : ALL_WEEKDAYS)
+                      : null,
+                    ...(enabled ? { reminderTimezone: check.reminderTimezone || browserTimeZone() } : {}),
+                  })}
+                  onTimeChange={(reminderTime) => updateDailyCheck.mutate({ id: check.id, reminderTime })}
+                  onDaysChange={(reminderDays) => updateDailyCheck.mutate({ id: check.id, reminderDays })}
+                  onEnableNotifications={subscribeToPush}
+                />
                 {/* Track days + delete */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">

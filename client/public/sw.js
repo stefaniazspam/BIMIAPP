@@ -27,11 +27,11 @@ self.addEventListener("push", (event) => {
       url: data.url || "/promemoria",
       reminderId: data.reminderId,
     },
-    actions: [
+    actions: data.reminderId ? [
       { action: "done",     title: "✅ Fatto!" },
       { action: "snooze",   title: "⏰ Fra 5 min" },
       { action: "tomorrow", title: "📅 Domani" },
-    ],
+    ] : [],
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
